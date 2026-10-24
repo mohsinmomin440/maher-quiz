@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/auth_service.dart';
 import '../../services/cloud_service.dart';
 import '../../utils/app_localization.dart';
@@ -9,7 +11,7 @@ import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-const LoginScreen({super.key, });
+  const LoginScreen({super.key});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -64,8 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) =>
-              HomeScreen(),
+          builder: (context) => HomeScreen(),
         ),
       );
     } else {
@@ -83,6 +84,107 @@ class _LoginScreenState extends State<LoginScreen> {
                 ? 'Invalid email address or password.'
                 : 'Invalid mobile number, email address, or password.';
         }
+      });
+    }
+  }
+
+  /// Signs in with Google and creates/updates local account
+  Future<void> _signInWithGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Trigger the Google Sign-In flow
+      final GoogleSignInAccount? googleUser = await GoogleSignIn(
+        scopes: ['email', 'profile'],
+      ).signIn();
+
+      if (googleUser == null) {
+        // User cancelled the sign-in
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google credential
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (!mounted || user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // Create or update local account with Google user data
+      final email = user.email ?? '';
+      final name = user.displayName ?? user.email?.split('@').first ?? 'Student';
+
+      // Register in local DB
+      final error = await AuthService.register(
+        name: name,
+        identifier: email,
+        password: '', // Google users don't have passwords
+        ageGroup: 'General / Adult',
+      );
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (error == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${AppLocalization.tr('login_welcome')}, $name!'),
+            backgroundColor: MaherTheme.emeraldPrimary,
+          ),
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+          (route) => false,
+        );
+      } else if (error == 'already_registered') {
+        // User exists, just sign in locally
+        final loginResult = await AuthService.login(
+          identifier: email,
+          password: '',
+          rememberMe: true,
+        );
+        if (!mounted) return;
+        if (loginResult.user != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${AppLocalization.tr('login_welcome')}, ${loginResult.user!.name}!'),
+              backgroundColor: MaherTheme.emeraldPrimary,
+            ),
+          );
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => HomeScreen()),
+            (route) => false,
+          );
+        } else {
+          setState(() => _errorMessage = 'Account issue. Please try again.');
+        }
+      } else {
+        setState(() => _errorMessage = 'Could not sign in. Please try again.');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString().replaceAll('Exception: ', '');
       });
     }
   }
@@ -235,9 +337,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             hintText: '9876543210 or admin@maher.app',
                             prefixIcon: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: MaherIcons.get('user',
-                                  size: 20, color: MaherTheme.emeraldPrimary),
+                                padding: const EdgeInsets.all(12),
+                                child: MaherIcons.get('user',
+                                    size: 20, color: MaherTheme.emeraldPrimary),
                             ),
                           ),
                           validator: (value) {
@@ -276,9 +378,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             hintText: '••••••••',
                             prefixIcon: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: MaherIcons.get('lock',
-                                  size: 20, color: MaherTheme.emeraldPrimary),
+                                padding: const EdgeInsets.all(12),
+                                child: MaherIcons.get('lock',
+                                    size: 20, color: MaherTheme.emeraldPrimary),
                             ),
                             suffixIcon: IconButton(
                               icon: MaherIcons.get(
@@ -295,7 +397,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           validator: (value) {
                             if (value == null || value.length < 6) {
-                              return AppLocalization.tr('password_min_length');
+                                return AppLocalization.tr('password_min_length');
                             }
                             return null;
                           },
@@ -398,6 +500,80 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                           ),
                         ),
+                        const SizedBox(height: 16),
+
+                        // OR Divider
+                        const Row(
+                          children: [
+                            Expanded(child: Divider(color: Colors.grey)),
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                'OR',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ),
+                            Expanded(child: Divider(color: Colors.grey)),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Google Sign-In Button
+                        GestureDetector(
+                          onTap: _isLoading ? null : _signInWithGoogle,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: Colors.grey.shade300,
+                                width: 1.5,
+                              ),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black12,
+                                  offset: Offset(0, 2),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                // Google "G" logo
+                                Container(
+                                  width: 24,
+                                  height: 24,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.white,
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: const Center(
+                                    child: Text(
+                                      'G',
+                                      style: TextStyle(
+                                        color: Colors.blue,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'Continue with Google',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                         const SizedBox(height: 22),
 
                         // Register Link
@@ -433,4 +609,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-
