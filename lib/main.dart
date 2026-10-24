@@ -1,5 +1,3 @@
-import 'package:device_preview/device_preview.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/splash_screen.dart';
@@ -9,7 +7,7 @@ import 'utils/maher_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await Firebase.initializeApp();
   } catch (e) {
@@ -24,12 +22,7 @@ void main() async {
     debugPrint('Supabase init failed, continuing offline: $e');
   }
 
-  runApp(
-    DevicePreview(
-      enabled: kIsWeb && !kReleaseMode,
-      builder: (context) => const MaherQuizApp(),
-    ),
-  );
+  runApp(const MaherQuizApp());
 }
 
 class MaherQuizApp extends StatelessWidget {
@@ -40,8 +33,6 @@ class MaherQuizApp extends StatelessWidget {
     AppLocalization.currentLang = 'en';
     return MaterialApp(
       title: 'Maher Quiz',
-      locale: DevicePreview.locale(context),
-      builder: DevicePreview.appBuilder,
       debugShowCheckedModeBanner: false,
       theme: MaherTheme.themeData,
       home: const SplashScreen(),

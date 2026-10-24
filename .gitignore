@@ -9,6 +9,7 @@ build/
 android/local.properties
 android/key.properties
 android/app/google-services.json
+android/.kotlin/
 *.apk
 *.aab
 
@@ -27,6 +28,10 @@ build/windows/
 
 # Web
 build/web/
+
+# Prebuilt binaries & artifacts
+*.exe
+*.log
 
 # Project specific
 supabase.json
