@@ -1,0 +1,50 @@
+import 'package:device_preview/device_preview.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'screens/splash_screen.dart';
+import 'services/cloud_service.dart';
+import 'utils/app_localization.dart';
+import 'utils/maher_theme.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase init failed: $e');
+  }
+
+  // Connects to Supabase only when built with SUPABASE_URL/SUPABASE_ANON_KEY
+  // (see SUPABASE_SETUP.md); otherwise the app runs fully local
+  try {
+    await CloudService.initialize();
+  } catch (e) {
+    debugPrint('Supabase init failed, continuing offline: $e');
+  }
+
+  runApp(
+    DevicePreview(
+      enabled: kIsWeb && !kReleaseMode,
+      builder: (context) => const MaherQuizApp(),
+    ),
+  );
+}
+
+class MaherQuizApp extends StatelessWidget {
+  const MaherQuizApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    AppLocalization.currentLang = 'en';
+    return MaterialApp(
+      title: 'Maher Quiz',
+      locale: DevicePreview.locale(context),
+      builder: DevicePreview.appBuilder,
+      debugShowCheckedModeBanner: false,
+      theme: MaherTheme.themeData,
+      home: const SplashScreen(),
+    );
+  }
+}

@@ -1,0 +1,37 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+
+# Android
+android/local.properties
+android/key.properties
+android/app/google-services.json
+*.apk
+*.aab
+
+# iOS
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Flutter/Flutter.podspec
+ios/ServiceDefinitions.json
+Pods/
+.symlinks/
+*.ipa
+
+# Windows
+windows/flutter/ephemeral/
+build/windows/
+
+# Web
+build/web/
+
+# Project specific
+supabase.json
+.env
+*.iml
+.idea/
+.vscode/
+.DS_Store
