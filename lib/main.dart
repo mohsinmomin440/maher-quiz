@@ -8,6 +8,7 @@ import 'utils/maher_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Firebase (required for Phone Auth OTP flow)
   try {
     await Firebase.initializeApp();
   } catch (e) {
