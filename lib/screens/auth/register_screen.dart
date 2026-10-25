@@ -50,6 +50,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     var phone = _phoneController.text.trim();
+    // Use normalizePhone so registration and login use the same stored format
+    final normalized = AuthService.normalizePhone(phone);
+    // Build a normalized international format for Firebase
+    phone = normalized.isNotEmpty ? '+91$normalized' : phone;
     if (!phone.startsWith('+')) {
       if (phone.length == 10) {
         phone = '+91$phone';
@@ -150,7 +154,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Firebase sign-in succeeded, now create/update local account
       if (!mounted) return;
       setState(() => _isOtpVerifying = false);
-      await _completeRegistration(userCredential.user!.phoneNumber ?? '');
+      // Normalize phone to last 10 digits so it matches what login expects
+      final digits = userCredential.user!.phoneNumber!.replaceAll(RegExp(r'\D'), '');
+      final normalizedPhone = digits.length >= 10 ? digits.substring(digits.length - 10) : digits;
+      await _completeRegistration(normalizedPhone);
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -164,10 +171,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Future<void> _completeRegistration(String verifiedPhone) async {
     setState(() => _isLoading = true);
 
-    // Use the verified phone as identifier
-    final identifier = verifiedPhone.isEmpty
+    // Use AuthService.normalizePhone so it matches what login expects
+    final normalizedPhone = AuthService.normalizePhone(verifiedPhone);
+
+    // Use the normalized phone as identifier
+    final identifier = normalizedPhone.isEmpty
         ? _phoneController.text.trim()
-        : verifiedPhone;
+        : normalizedPhone;
 
     final error = await AuthService.register(
       name: _nameController.text,
@@ -200,6 +210,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           case 'already_registered':
             _errorMessage =
                 'This mobile number is already registered. Please login.';
+            break;
+          case 'confirm_email':
+            _errorMessage = AppLocalization.tr('email_not_confirmed');
             break;
           case 'weak_password':
             _errorMessage = AppLocalization.tr('password_min_length');
@@ -493,7 +506,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         const Divider(),
                         const SizedBox(height: 8),
                         Text(
-                          'Enter 6-digit OTP sent to your mobile',
+                          AppLocalization.tr('enter_otp_sent'),
                           style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
@@ -567,7 +580,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           size: 18, color: Colors.white),
                                       const SizedBox(width: 8),
                                       Text(
-                                        'Send OTP & Register',
+                                        AppLocalization.tr('send_otp_register'),
                                         style: const TextStyle(
                                           fontSize: 16.5,
                                           fontWeight: FontWeight.w900,
@@ -619,7 +632,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           size: 18, color: Colors.white),
                                       const SizedBox(width: 8),
                                       Text(
-                                        'Verify OTP & Register',
+                                        AppLocalization.tr('verify_otp_register'),
                                         style: const TextStyle(
                                           fontSize: 16.5,
                                           fontWeight: FontWeight.w900,

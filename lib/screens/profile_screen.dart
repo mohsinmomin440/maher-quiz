@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/badge_model.dart';
@@ -250,21 +251,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Row(
+        title: Row(
           children: [
             Icon(Icons.warning_amber_rounded, size: 26, color: MaherTheme.errorRed),
-            SizedBox(width: 10),
-            Text('Delete Account?', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 10),
+            Text(
+              AppLocalization.tr('delete_account_title'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
-        content: const Text(
-          'This action is irreversible. All your quiz history, bookmarks, streaks, and scores will be permanently deleted.',
-          style: TextStyle(fontSize: 14, color: Colors.black87),
+        content: Text(
+          AppLocalization.tr('delete_account_confirm'),
+          style: const TextStyle(fontSize: 14, color: Colors.black87),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalization.tr('cancel')),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
@@ -274,20 +278,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete Permanently'),
+            child: Text(AppLocalization.tr('yes_delete')),
           ),
         ],
       ),
     );
 
-    if (confirm == true && mounted) {
-      await AuthService.deleteCurrentAccount();
-      if (!mounted) return;
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+    if (confirm != true || !mounted) return;
+
+    // Show loading overlay to prevent double-tap
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    final result = await AuthService.deleteCurrentAccount();
+
+    if (!mounted) return;
+    Navigator.pop(context); // dismiss loader
+
+    switch (result) {
+      case DeleteResult.success:
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+        break;
+      case DeleteResult.needsRelogin:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalization.tr('delete_needs_relogin')),
+            backgroundColor: MaherTheme.errorRed,
+          ),
+        );
+        break;
+      case DeleteResult.serverFailed:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalization.tr('delete_server_failed')),
+            backgroundColor: MaherTheme.errorRed,
+          ),
+        );
+        break;
+      case DeleteResult.notSignedIn:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalization.tr('you_are_not_logged_in')),
+            backgroundColor: MaherTheme.errorRed,
+          ),
+        );
+        break;
     }
   }
 

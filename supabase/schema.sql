@@ -221,7 +221,7 @@ end $$;
 -- P0 FIX: Mandatory In-App Account Deletion (Apple App Store & Google Play Store Compliance)
 create or replace function public.delete_my_account()
 returns boolean
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = '' as $$
 declare
   uid uuid := auth.uid();
 begin

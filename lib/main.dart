@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/splash_screen.dart';
+import 'services/auth_service.dart';
 import 'services/cloud_service.dart';
 import 'utils/app_localization.dart';
 import 'utils/maher_theme.dart';
@@ -22,6 +23,10 @@ void main() async {
   } catch (e) {
     debugPrint('Supabase init failed, continuing offline: $e');
   }
+
+  // Seed the local users DB once at startup (prevents race conditions from
+  // calling ensureSeeded() on every getCurrentUser() call).
+  await AuthService.ensureSeeded();
 
   runApp(const MaherQuizApp());
 }

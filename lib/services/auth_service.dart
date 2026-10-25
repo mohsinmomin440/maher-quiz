@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
 import 'cloud_service.dart';
@@ -18,6 +20,13 @@ class AuthService {
   static String hashPassword(String password) {
     final bytes = utf8.encode(password + _salt);
     return sha256.convert(bytes).toString();
+  }
+
+  /// Strips non-digits and keeps the last 10. Used everywhere phone numbers
+  /// touch the local DB so registration and login produce the same stored value.
+  static String normalizePhone(String raw) {
+    final digits = raw.replaceAll(RegExp(r'\D'), '');
+    return digits.length >= 10 ? digits.substring(digits.length - 10) : digits;
   }
 
   // Current session's user ID, read straight from prefs (no seeding)
@@ -52,8 +61,11 @@ class AuthService {
     return scoped;
   }
 
+  static bool _seeded = false;
+
   // Pre-seed default Student and purge any old admin accounts
   static Future<void> ensureSeeded() async {
+    if (_seeded) return;
     final prefs = await SharedPreferences.getInstance();
     final usersStr = prefs.getString(_usersDbKey);
 
@@ -102,11 +114,11 @@ class AuthService {
 
     await prefs.setString(_usersDbKey, json.encode(users));
     await prefs.setString(_passwordsDbKey, json.encode(passwords));
+    _seeded = true;
   }
 
   // Get current logged-in user with session integrity check
   static Future<UserModel?> getCurrentUser() async {
-    await ensureSeeded();
     final prefs = await SharedPreferences.getInstance();
     final userStr = prefs.getString(_userKey);
     if (userStr != null) {
@@ -143,9 +155,9 @@ class AuthService {
     required String ageGroup,
   }) async {
     final rawInput = (identifier ?? email ?? '').trim();
-    final cleanDigits = rawInput.replaceAll(RegExp(r'\D'), '');
-    final isPhone = cleanDigits.length >= 10 && !rawInput.contains('@');
-    final mappedEmail = isPhone ? '$cleanDigits@phone.maher.quiz' : rawInput.toLowerCase();
+    final cleanDigits = normalizePhone(rawInput);
+    final isPhone = cleanDigits.length == 10 && !rawInput.contains('@');
+    final mappedEmail = isPhone ? cleanDigits : rawInput.toLowerCase().trim();
 
     if (CloudService.isEnabled) {
       final res = await CloudService.signUp(
@@ -238,10 +250,13 @@ class AuthService {
     bool rememberMe = true,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    
-    final cleanDigits = identifier.replaceAll(RegExp(r'\D'), '');
-    final isPhone = cleanDigits.length >= 10 && !identifier.contains('@');
-    final mappedEmail = isPhone ? '$cleanDigits@phone.maher.quiz' : identifier.trim().toLowerCase();
+
+    final cleanDigits = normalizePhone(identifier);
+    final isPhone = cleanDigits.length == 10 && !identifier.contains('@');
+    // Use the same fake email format as register for cloud mode consistency
+    final mappedEmail = isPhone
+        ? '$cleanDigits@phone.maher.quiz'
+        : identifier.trim().toLowerCase();
 
     if (CloudService.isEnabled) {
       final res =
@@ -260,14 +275,6 @@ class AuthService {
       SharedPreferences prefs, String identifier, String password) async {
     await ensureSeeded();
     final cleanInput = identifier.trim().toLowerCase();
-    // Only treat the input as a phone number when it isn't an email
-    var cleanDigits = cleanInput.contains('@')
-        ? ''
-        : identifier.replaceAll(RegExp(r'\D'), '');
-    // Phones are stored as 10 digits; accept a country-code prefix (+91 …)
-    if (cleanDigits.length > 10) {
-      cleanDigits = cleanDigits.substring(cleanDigits.length - 10);
-    }
 
     final passStr = prefs.getString(_passwordsDbKey);
     if (passStr == null) return null;
@@ -286,7 +293,7 @@ class AuthService {
       final u = UserModel.fromMap(entry.value);
       if (entry.key.toLowerCase() == cleanInput ||
           u.email.toLowerCase() == cleanInput ||
-          (cleanDigits.isNotEmpty && u.phone == cleanDigits)) {
+          (u.phone.isNotEmpty && normalizePhone(u.phone) == normalizePhone(cleanInput))) {
         matchedKey = entry.key;
         matchedUser = u;
         break;
@@ -345,38 +352,75 @@ class AuthService {
     await prefs.remove(_userKey);
     await prefs.remove(_sessionTemporaryKey);
     await CloudService.signOut();
+    try { await FirebaseAuth.instance.signOut(); } catch (_) {}
+    try { await GoogleSignIn().disconnect(); } catch (_) {}
   }
 
   // Self-deletion of current user account (Store compliance & DPDP privacy)
-  static Future<bool> deleteCurrentAccount() async {
+  static Future<DeleteResult> deleteCurrentAccount() async {
     final currentUser = await getCurrentUser();
-    if (currentUser == null) return false;
+    if (currentUser == null) return DeleteResult.notSignedIn;
 
-    if (CloudService.isEnabled && CloudService.hasSession) {
-      await CloudService.deleteAccount();
+    // 1) Server delete first — if this fails we must NOT wipe local data
+    if (CloudService.isEnabled) {
+      if (!CloudService.hasSession) return DeleteResult.needsRelogin;
+      final serverOk = await CloudService.deleteAccount();
+      if (!serverOk) return DeleteResult.serverFailed;
     }
 
+    // 2) Third-party identities (best effort, always try)
+    try { await FirebaseAuth.instance.currentUser?.delete(); } catch (_) {}
+    try { await FirebaseAuth.instance.signOut(); } catch (_) {}
+    try { await GoogleSignIn().disconnect(); } catch (_) {}
+
+    // 3) Local data — find keys by iterating the DB (keys are email/phone, not ID)
     final prefs = await SharedPreferences.getInstance();
     final usersStr = prefs.getString(_usersDbKey);
+    Map<String, dynamic> users = {};
     if (usersStr != null) {
-      Map<String, dynamic> users = json.decode(usersStr);
-      users.remove(currentUser.id);
-      users.remove(currentUser.email.toLowerCase());
-      if (currentUser.phone.isNotEmpty) users.remove(currentUser.phone);
-      await prefs.setString(_usersDbKey, json.encode(users));
+      try { users = json.decode(usersStr); } catch (_) {}
     }
 
+    // Collect all keys that belong to this user (DB key + email + phone aliases)
+    final keysToRemove = <String>{
+      currentUser.email.toLowerCase(),
+      if (currentUser.phone.isNotEmpty) currentUser.phone,
+    };
+    // Also remove any entry whose user map has matching id/email/phone
+    for (final entry in users.entries.toList()) {
+      if (entry.value is Map<String, dynamic>) {
+        final u = UserModel.fromMap(entry.value);
+        if (u.id == currentUser.id ||
+            u.email.toLowerCase() == currentUser.email.toLowerCase() ||
+            (currentUser.phone.isNotEmpty && u.phone == currentUser.phone)) {
+          keysToRemove.add(entry.key);
+        }
+      }
+    }
+    for (final k in keysToRemove) {
+      users.remove(k);
+    }
+    await prefs.setString(_usersDbKey, json.encode(users));
+
+    // Remove password entries under all aliases
     final passStr = prefs.getString(_passwordsDbKey);
+    Map<String, dynamic> pass = {};
     if (passStr != null) {
-      Map<String, dynamic> pass = json.decode(passStr);
-      pass.remove(currentUser.id);
-      pass.remove(currentUser.email.toLowerCase());
-      if (currentUser.phone.isNotEmpty) pass.remove(currentUser.phone);
-      await prefs.setString(_passwordsDbKey, json.encode(pass));
+      try { pass = json.decode(passStr); } catch (_) {}
+    }
+    for (final k in keysToRemove) {
+      pass.remove(k);
+    }
+    await prefs.setString(_passwordsDbKey, json.encode(pass));
+
+    // 4) Erase per-user scoped prefs
+    for (final base in _userScopedBaseKeys) {
+      await prefs.remove('${base}_${currentUser.id}');
+      await prefs.remove(base); // legacy device-wide
     }
 
     await logout();
-    return true;
+    return DeleteResult.success;
   }
 
   // ---------------------------------------------------------------------------
@@ -421,8 +465,8 @@ class AuthService {
           u.email.toLowerCase() == user.email.toLowerCase();
     });
     users[user.email.toLowerCase()] = user.toMap();
-    await prefs.setString(_usersDbKey, json.encode(users));
     await prefs.setString(_userKey, user.toJson());
+    await prefs.setString(_usersDbKey, json.encode(users));
 
     if (legacyLocalId != null && legacyLocalId != user.id) {
       await _migrateScopedPrefs(prefs, legacyLocalId, user.id);
@@ -621,10 +665,8 @@ class AuthService {
   static MapEntry<String, UserModel>? _findUserEntry(
       Map<String, dynamic> users, String identifier) {
     final normalized = identifier.trim().toLowerCase();
-    final cleanDigits = normalized.replaceAll(RegExp(r'\D'), '');
-    final last10Digits = cleanDigits.length >= 10
-        ? cleanDigits.substring(cleanDigits.length - 10)
-        : cleanDigits;
+    final cleanDigits = normalizePhone(normalized);
+    final last10Digits = cleanDigits.length == 10 ? cleanDigits : normalized;
 
     for (final entry in users.entries) {
       if (entry.value is! Map<String, dynamic>) continue;
@@ -667,6 +709,13 @@ class AuthService {
       if (foundUser.id.isNotEmpty) pass.remove(foundUser.id);
       await prefs.setString(_passwordsDbKey, json.encode(pass));
     }
+
+    // D5: Clear per-user scoped prefs
+    for (final base in _userScopedBaseKeys) {
+      await prefs.remove('${base}_${foundUser.id}');
+      await prefs.remove(base);
+    }
+
     return true;
   }
 
@@ -750,7 +799,7 @@ class AuthService {
     }
 
     Map<String, dynamic> users = json.decode(usersStr);
-    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    final cleanPhone = normalizePhone(phone);
     final cleanEmail = email.trim().toLowerCase();
 
     // Cloud mode: name and age group are saved to Supabase; the email is the
@@ -1008,3 +1057,5 @@ class PasswordChangeResult {
   });
 }
 
+/// Result of deleting the current account (D1–D3).
+enum DeleteResult { success, notSignedIn, needsRelogin, serverFailed }

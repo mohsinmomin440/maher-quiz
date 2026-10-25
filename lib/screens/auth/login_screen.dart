@@ -1,6 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/auth_service.dart';
 import '../../services/cloud_service.dart';
 import '../../utils/app_localization.dart';
@@ -81,14 +79,17 @@ class _LoginScreenState extends State<LoginScreen> {
             break;
           default:
             _errorMessage = CloudService.isEnabled
-                ? 'Invalid email address or password.'
-                : 'Invalid mobile number, email address, or password.';
+                ? AppLocalization.tr('invalid_credentials')
+                : AppLocalization.tr('enter_valid_email_or_mobile');
         }
       });
     }
   }
 
-  /// Signs in with Google and creates/updates local account
+  /// Signs in with Google via Supabase OAuth (not Firebase).
+  /// Fixes G1: was broken in online mode because it created a Firebase user
+  /// then called register(password: ''), which Supabase rejects.
+  /// Fixes G3: also signs out of Google/Firebase so accounts can be switched.
   Future<void> _signInWithGoogle() async {
     setState(() {
       _isLoading = true;
@@ -96,56 +97,15 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Trigger the Google Sign-In flow
-      final GoogleSignInAccount? googleUser = await GoogleSignIn(
-        scopes: ['email', 'profile'],
-      ).signIn();
-
-      if (googleUser == null) {
-        // User cancelled the sign-in
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Sign in to Firebase with the Google credential
-      final userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-      final user = userCredential.user;
-
-      if (!mounted || user == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      // Create or update local account with Google user data
-      final email = user.email ?? '';
-      final name = user.displayName ?? user.email?.split('@').first ?? 'Student';
-
-      // Register in local DB
-      final error = await AuthService.register(
-        name: name,
-        identifier: email,
-        password: '', // Google users don't have passwords
-        ageGroup: 'General / Adult',
-      );
+      final result = await CloudService.signInWithGoogle();
 
       if (!mounted) return;
       setState(() => _isLoading = false);
 
-      if (error == null) {
+      if (result.user != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${AppLocalization.tr('login_welcome')}, $name!'),
+            content: Text('${AppLocalization.tr('login_welcome')}, ${result.user!.name}!'),
             backgroundColor: MaherTheme.emeraldPrimary,
           ),
         );
@@ -154,37 +114,32 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (context) => HomeScreen()),
           (route) => false,
         );
-      } else if (error == 'already_registered') {
-        // User exists, just sign in locally
-        final loginResult = await AuthService.login(
-          identifier: email,
-          password: '',
-          rememberMe: true,
-        );
-        if (!mounted) return;
-        if (loginResult.user != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${AppLocalization.tr('login_welcome')}, ${loginResult.user!.name}!'),
-              backgroundColor: MaherTheme.emeraldPrimary,
-            ),
-          );
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => HomeScreen()),
-            (route) => false,
-          );
-        } else {
-          setState(() => _errorMessage = 'Account issue. Please try again.');
-        }
-      } else {
-        setState(() => _errorMessage = 'Could not sign in. Please try again.');
+        return;
+      }
+
+      // Map error codes to localized messages
+      switch (result.error) {
+        case 'cancelled':
+          break; // user cancelled — no error to show
+        case 'invalid_credentials':
+          setState(() => _errorMessage = AppLocalization.tr('google_sign_in_failed'));
+          break;
+        case 'email_not_confirmed':
+          setState(() => _errorMessage = AppLocalization.tr('email_not_confirmed'));
+          break;
+        case 'network':
+        case 'signup_failed':
+        case 'profile_missing':
+          setState(() => _errorMessage = AppLocalization.tr('network_error'));
+          break;
+        default:
+          setState(() => _errorMessage = AppLocalization.tr('google_sign_in_failed'));
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
+        _errorMessage = AppLocalization.tr('google_sign_in_failed');
       });
     }
   }
@@ -345,16 +300,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           validator: (value) {
                             final input = value?.trim() ?? '';
                             if (input.isEmpty) {
-                              return 'Please enter your mobile number or email';
+                              return AppLocalization.tr('enter_valid_email_or_mobile');
                             }
                             if (input.contains('@')) {
                               if (!input.contains('.') || input.length < 5) {
-                                return 'Please enter a valid email address';
+                                return AppLocalization.tr('enter_valid_email');
                               }
                             } else {
                               final digits = input.replaceAll(RegExp(r'\D'), '');
                               if (digits.length < 10) {
-                                return 'Please enter a valid 10-digit mobile number';
+                                return AppLocalization.tr('enter_mobile_number');
                               }
                             }
                             return null;
@@ -378,9 +333,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           decoration: InputDecoration(
                             hintText: '••••••••',
                             prefixIcon: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: MaherIcons.get('lock',
-                                    size: 20, color: MaherTheme.emeraldPrimary),
+                              padding: const EdgeInsets.all(12),
+                              child: MaherIcons.get('lock',
+                                  size: 20, color: MaherTheme.emeraldPrimary),
                             ),
                             suffixIcon: IconButton(
                               icon: MaherIcons.get(
@@ -503,14 +458,14 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 16),
 
                         // OR Divider
-                        const Row(
+                        Row(
                           children: [
                             Expanded(child: Divider(color: Colors.grey)),
                             Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: Text(
-                                'OR',
-                                style: TextStyle(color: Colors.grey),
+                                AppLocalization.tr('or_continue_with'),
+                                style: const TextStyle(color: Colors.grey),
                               ),
                             ),
                             Expanded(child: Divider(color: Colors.grey)),
@@ -562,9 +517,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                const Text(
-                                  'Continue with Google',
-                                  style: TextStyle(
+                                Text(
+                                  AppLocalization.tr('continue_with_google'),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.black87,

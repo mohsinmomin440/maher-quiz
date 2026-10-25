@@ -123,7 +123,6 @@ class AppLocalization {
       'make_admin': 'એડમિન બનાવો',
       'remove_admin': 'એડમિન હટાવો',
       'confirm_delete': 'શું તમે ખરેખર આ વપરાશકર્તાને કાઢી નાખવા માંગો છો?',
-      'yes_delete': 'હા, કાઢી નાખો',
       'cancel': 'રદ કરો',
       'password_reset_by_admin': 'પાસવર્ડ ૧૨૩૪૫૬ પર રીસેટ કર્યો',
       'access_denied': 'ઍક્સેસ નકારવામાં આવ્યો! ફક્ત એડમિન માટે.',
@@ -158,6 +157,10 @@ class AppLocalization {
       'account_details': 'ખાતાની વિગતો',
       'security_settings': 'સુરક્ષા અને સેટિંગ્સ',
       'member_since': 'સભ્ય બન્યા',
+      // Register OTP
+      'enter_otp_sent': 'તમારા મોબાઈલ પર મોકલાયેલ ૬-અંકનો ઓટીપી દાખલ કરો',
+      'send_otp_register': 'ઓટીપી મોકલો અને નોંધણી કરો',
+      'verify_otp_register': 'ઓટીપી ચકાસો અને નોંધણી કરો',
     },
     'hi': {
       'app_name': 'Maher Quiz',
@@ -280,7 +283,6 @@ class AppLocalization {
       'make_admin': 'एडमिन बनाएं',
       'remove_admin': 'एडमिन हटाएं',
       'confirm_delete': 'क्या आप वाकई इस उपयोगकर्ता को हटाना चाहते हैं?',
-      'yes_delete': 'हाँ, हटाएं',
       'cancel': 'रद्द करें',
       'password_reset_by_admin': 'पासवर्ड 123456 पर रीसेट किया गया',
       'access_denied': 'पहुँच अस्वीकृत! केवल एडमिन के लिए।',
@@ -315,6 +317,10 @@ class AppLocalization {
       'account_details': 'खाता विवरण',
       'security_settings': 'सुरक्षा और सेटिंग्स',
       'member_since': 'सदस्य बने',
+      // Register OTP
+      'enter_otp_sent': 'अपने मोबाइल पर भेजे गए ६-अंकों का ओटीपी दर्ज करें',
+      'send_otp_register': 'ओटीपी भेजें और रजिस्टर करें',
+      'verify_otp_register': 'ओटीपी सत्यापित करें और रजिस्टर करें',
     },
     'en': {
       'app_name': 'Maher Quiz',
@@ -447,7 +453,6 @@ class AppLocalization {
       'make_admin': 'Promote to Admin',
       'remove_admin': 'Demote to Student',
       'confirm_delete': 'Are you sure you want to remove this user account?',
-      'yes_delete': 'Yes, Delete',
       'cancel': 'Cancel',
       'password_reset_by_admin': 'Password reset to 123456',
       'access_denied': 'Access Denied! Administrators only.',
@@ -479,9 +484,14 @@ class AppLocalization {
       'password_updated_success': 'Password changed successfully!',
       'mobile_already_registered': 'This mobile number is already registered by another user.',
       'email_already_registered': 'This email address is already registered by another user.',
+      'invalid_credentials': 'Invalid email address or password.',
       'account_details': 'Account Details',
       'security_settings': 'Security & Settings',
       'member_since': 'Member Since',
+      // Register OTP
+      'enter_otp_sent': 'Enter the 6-digit OTP sent to your mobile',
+      'send_otp_register': 'Send OTP & Register',
+      'verify_otp_register': 'Verify OTP & Register',
     },
   };
 

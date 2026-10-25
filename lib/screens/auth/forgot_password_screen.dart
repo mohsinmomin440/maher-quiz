@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
+import '../../services/cloud_service.dart';
 import '../../utils/app_localization.dart';
 import '../../utils/maher_icons.dart';
 import '../../utils/maher_theme.dart';
@@ -9,45 +10,48 @@ class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() =>
-      _ForgotPasswordScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState
-    extends State<ForgotPasswordScreen> {
-  final _phoneController = TextEditingController();
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _identifierController = TextEditingController();
   final _codeController = TextEditingController();
   final _newPasswordController = TextEditingController();
 
   bool _codeSent = false;
-  final bool _codeVerified = false;
+  bool _codeVerified = false; // non-final: set to true after OTP success
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
   String? _verificationId;
 
+  /// In cloud mode we use email; in local mode we use phone.
+  bool get _isCloud => CloudService.isEnabled;
+
   @override
   void dispose() {
-    _phoneController.dispose();
+    _identifierController.dispose();
     _codeController.dispose();
     _newPasswordController.dispose();
     super.dispose();
   }
 
-  /// Sends a 6-digit OTP to the phone number
+  /// Sends a reset code (email in cloud mode, SMS OTP in local mode)
   Future<void> _sendCode() async {
-    var phone = _phoneController.text.trim();
-    if (phone.isEmpty || phone.length < 10) {
-      setState(() =>
-          _errorMessage = 'Please enter a valid mobile number');
+    final input = _identifierController.text.trim();
+    if (input.isEmpty) {
+      setState(() => _errorMessage = _isCloud
+          ? 'Please enter a valid email address'
+          : 'Please enter a valid mobile number');
       return;
     }
-    if (!phone.startsWith('+')) {
-      if (phone.length == 10) {
-        phone = '+91$phone';
-      } else {
-        phone = '+$phone';
-      }
+    if (_isCloud && (!input.contains('@') || !input.contains('.'))) {
+      setState(() => _errorMessage = 'Please enter a valid email address');
+      return;
+    }
+    if (!_isCloud && input.length < 10) {
+      setState(() => _errorMessage = 'Please enter a valid mobile number');
+      return;
     }
 
     setState(() {
@@ -56,29 +60,57 @@ class _ForgotPasswordScreenState
     });
 
     try {
-      await FirebaseAuth.instance.verifyPhoneNumber(
-        phoneNumber: phone,
-        verificationCompleted: (PhoneAuthCredential credential) {
-          // Auto-verification: proceed to reset
-          _verifyWithCredential(credential, phone);
-        },
-        verificationFailed: (FirebaseAuthException e) {
-          if (!mounted) return;
-          setState(() {
-            _isLoading = false;
-            _errorMessage = e.message ?? 'Verification failed';
-          });
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          if (!mounted) return;
+      if (_isCloud) {
+        // Cloud mode: send Supabase password reset email
+        final email = input.toLowerCase();
+        final ok = await CloudService.sendPasswordResetCode(email);
+        if (!mounted) return;
+        if (ok) {
           setState(() {
             _isLoading = false;
             _codeSent = true;
-            _verificationId = verificationId;
+            _verificationId = 'supabase'; // marker
           });
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {},
-      );
+        } else {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Failed to send reset code. Check your internet connection.';
+          });
+        }
+      } else {
+        // Local mode: send Firebase SMS OTP
+        var phone = input;
+        if (!phone.startsWith('+')) {
+          if (phone.length == 10) {
+            phone = '+91$phone';
+          } else {
+            phone = '+$phone';
+          }
+        }
+
+        await FirebaseAuth.instance.verifyPhoneNumber(
+          phoneNumber: phone,
+          verificationCompleted: (PhoneAuthCredential credential) {
+            _verifyWithCredential(credential, phone);
+          },
+          verificationFailed: (FirebaseAuthException e) {
+            if (!mounted) return;
+            setState(() {
+              _isLoading = false;
+              _errorMessage = e.message ?? 'Verification failed';
+            });
+          },
+          codeSent: (String verificationId, int? resendToken) {
+            if (!mounted) return;
+            setState(() {
+              _isLoading = false;
+              _codeSent = true;
+              _verificationId = verificationId;
+            });
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {},
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -88,40 +120,9 @@ class _ForgotPasswordScreenState
     }
   }
 
-  /// Verifies OTP and proceeds to password reset
-  Future<void> _verifyWithCredential(
-      PhoneAuthCredential credential, String phone) async {
-    setState(() => _isLoading = true);
-    try {
-      final userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
-      if (!mounted || userCredential.user == null) return;
-
-      // Firebase auth successful — now reset the password locally
-      final success =
-          await AuthService.adminResetPassword(phone, _newPasswordController.text);
-      if (!mounted) return;
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalization.tr('password_reset_success')),
-            backgroundColor: MaherTheme.emeraldPrimary,
-          ),
-        );
-        Navigator.pop(context);
-      } else {
-        setState(() => _errorMessage =
-            'No account found with this mobile number.');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() =>
-          _errorMessage = 'Verification failed. Please try again.');
-    }
-  }
-
-  /// Manual OTP verification (user enters the code)
+  /// Verifies the entered code.
+  /// Local mode: verifies Firebase OTP. Cloud mode: just accepts the code
+  /// (actual verification happens in _resetPassword via Supabase).
   Future<void> _verifyOtp() async {
     final code = _codeController.text.trim();
     if (code.length != 6) {
@@ -135,12 +136,23 @@ class _ForgotPasswordScreenState
     });
 
     try {
-      final credential = PhoneAuthProvider.credential(
-        verificationId: _verificationId!,
-        smsCode: code,
-      );
-      await _verifyWithCredential(
-          credential, _phoneController.text.trim());
+      if (_isCloud) {
+        // Cloud mode: don't verify here; just proceed to password entry.
+        // The Supabase reset will verify the code when we call resetPasswordWithCode.
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _codeVerified = true;
+          _errorMessage = null;
+        });
+      } else {
+        // Local mode: verify Firebase OTP
+        final credential = PhoneAuthProvider.credential(
+          verificationId: _verificationId!,
+          smsCode: code,
+        );
+        await _verifyWithCredential(credential, _identifierController.text.trim());
+      }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -156,17 +168,39 @@ class _ForgotPasswordScreenState
     }
   }
 
-  /// Reset password after OTP verification (local mode)
+  /// Verifies Firebase credential and proceeds to password entry (local mode only)
+  Future<void> _verifyWithCredential(
+      PhoneAuthCredential credential, String phone) async {
+    setState(() => _isLoading = true);
+    try {
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      if (!mounted) return;
+
+      // Firebase auth successful — move to the "set new password" screen.
+      // Do NOT reset the password here; wait for the user to enter a new one.
+      setState(() {
+        _isLoading = false;
+        _codeVerified = true;
+        _errorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Verification failed. Please try again.';
+      });
+    }
+  }
+
+  /// Reset password after OTP verification
   Future<void> _resetPassword() async {
     final newPass = _newPasswordController.text;
     if (newPass.length < 6) {
-      setState(
-          () => _errorMessage = AppLocalization.tr('password_min_length'));
+      setState(() => _errorMessage = AppLocalization.tr('password_min_length'));
       return;
     }
     if (newPass != newPass.trim()) {
-      setState(
-          () => _errorMessage = 'Password cannot start or end with a space');
+      setState(() => _errorMessage = 'Password cannot start or end with a space');
       return;
     }
 
@@ -175,8 +209,23 @@ class _ForgotPasswordScreenState
       _errorMessage = null;
     });
 
-    final success = await AuthService.adminResetPassword(
-        _phoneController.text.trim(), newPass);
+    final identifier = _identifierController.text.trim();
+
+    // Cloud mode: reset via Supabase (verifies code + sets password)
+    // Local mode: reset via local DB (phone + new password)
+    bool success;
+    if (_isCloud) {
+      final email = identifier.toLowerCase();
+      success = await CloudService.resetPasswordWithCode(
+        email: email,
+        code: _codeController.text.trim(),
+        newPassword: newPass,
+      );
+    } else {
+      // Local mode: use the normalized phone
+      final phone = AuthService.normalizePhone(identifier);
+      success = await AuthService.adminResetPassword(phone, newPass);
+    }
 
     if (!mounted) return;
     setState(() => _isLoading = false);
@@ -191,7 +240,7 @@ class _ForgotPasswordScreenState
       Navigator.pop(context);
     } else {
       setState(() =>
-          _errorMessage = 'No account found with this mobile number.');
+          _errorMessage = 'Failed to reset password. Please try again.');
     }
   }
 
@@ -237,10 +286,14 @@ class _ForgotPasswordScreenState
                           const SizedBox(height: 6),
                           Text(
                             _codeVerified
-                                ? 'Set your new password'
+                                ? AppLocalization.tr('new_password')
                                 : _codeSent
-                                    ? 'Enter the OTP sent via SMS'
-                                    : 'We will send a 6-digit OTP to verify',
+                                    ? (_isCloud
+                                        ? 'Enter the code sent to your email'
+                                        : 'Enter the OTP sent via SMS')
+                                    : (_isCloud
+                                        ? 'We will send a 6-digit code to your email'
+                                        : 'We will send a 6-digit OTP to verify'),
                             style: const TextStyle(
                               fontSize: 13,
                               color: MaherTheme.textSecondaryLight,
@@ -269,13 +322,13 @@ class _ForgotPasswordScreenState
   List<Widget> _buildForm() {
     return [
       TextField(
-        controller: _phoneController,
+        controller: _identifierController,
         enabled: !_codeSent,
-        keyboardType: TextInputType.phone,
+        keyboardType: _isCloud ? TextInputType.emailAddress : TextInputType.phone,
         decoration: InputDecoration(
-          labelText: AppLocalization.tr('mobile_number'),
-          hintText: '9876543210',
-          prefixText: '+91 ',
+          labelText: _isCloud ? AppLocalization.tr('email') : AppLocalization.tr('mobile_number'),
+          hintText: _isCloud ? 'student@maher.app' : '9876543210',
+          prefixText: _isCloud ? null : '+91 ',
           prefixStyle: const TextStyle(
             fontSize: 16,
             color: MaherTheme.emeraldDark,
@@ -283,7 +336,7 @@ class _ForgotPasswordScreenState
           ),
           prefixIcon: Padding(
             padding: const EdgeInsets.all(12),
-            child: MaherIcons.get('phone',
+            child: MaherIcons.get(_isCloud ? 'mail' : 'phone',
                 size: 20, color: MaherTheme.emeraldPrimary),
           ),
         ),
@@ -294,8 +347,8 @@ class _ForgotPasswordScreenState
           controller: _codeController,
           keyboardType: TextInputType.number,
           maxLength: 6,
-          decoration: const InputDecoration(
-            labelText: '6-digit code',
+          decoration: InputDecoration(
+            labelText: AppLocalization.tr('enter_otp'),
             counterText: '',
           ),
         ),
@@ -335,7 +388,7 @@ class _ForgotPasswordScreenState
               )
             : Text(_codeVerified
                 ? AppLocalization.tr('verify_and_update')
-                : (_codeSent ? 'Verify OTP' : AppLocalization.tr('send_otp'))),
+                : (_codeSent ? 'Verify Code' : AppLocalization.tr('send_otp'))),
       ),
       if (_codeSent && !_codeVerified)
         TextButton(
@@ -344,8 +397,9 @@ class _ForgotPasswordScreenState
               : () => setState(() {
                     _codeSent = false;
                     _errorMessage = null;
+                    _codeController.clear();
                   }),
-          child: const Text('Use a different mobile number'),
+          child: Text(_isCloud ? 'Use a different email' : AppLocalization.tr('change_number')),
         ),
     ];
   }

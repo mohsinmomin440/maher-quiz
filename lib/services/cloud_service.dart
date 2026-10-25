@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/backend_config.dart';
@@ -37,8 +38,11 @@ class CloudService {
   static bool get hasSession =>
       isEnabled && _client.auth.currentSession != null;
 
-  static String _todayStr() =>
-      DateTime.now().toIso8601String().substring(0, 10);
+  /// Returns the date string in IST (UTC+5:30), matching the server's expectation.
+  static String _todayStrIst() {
+    final ist = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    return ist.toIso8601String().substring(0, 10);
+  }
 
   // ---------------------------------------------------------------------------
   // Auth
@@ -106,12 +110,52 @@ class CloudService {
     }
   }
 
+  /// Signs in to Supabase using a Google ID token obtained from GoogleSignIn.
+  /// This avoids Firebase entirely for the Google flow.
+  static Future<CloudAuthResult> signInWithGoogle() async {
+    try {
+      final gs = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+      final account = await gs.signIn();
+      if (account == null) return const CloudAuthResult.failure('cancelled');
+      final auth = await account.authentication;
+      if (auth.idToken == null) return const CloudAuthResult.failure('signup_failed');
+
+      await _client.auth.signInWithIdToken(
+        provider: OAuthProvider.google,
+        idToken: auth.idToken!,
+        accessToken: auth.accessToken,
+      );
+      final user = await _loadProfileAndCache(importLegacy: true);
+      return user == null
+          ? const CloudAuthResult.failure('profile_missing')
+          : CloudAuthResult.success(user);
+    } on AuthException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('invalid')) return const CloudAuthResult.failure('invalid_credentials');
+      if (msg.contains('confir')) return const CloudAuthResult.failure('email_not_confirmed');
+      debugPrint('CloudService.signInWithGoogle: $e');
+      return const CloudAuthResult.failure('network');
+    } catch (_) {
+      return const CloudAuthResult.failure('network');
+    }
+  }
+
   static Future<void> signOut() async {
     if (!isEnabled) return;
     try {
       await _client.auth.signOut();
     } catch (e) {
       debugPrint('CloudService.signOut: $e');
+    }
+    // Sign out of Google so the next "Continue with Google" doesn't
+    // silently reuse the previous account (fixes G3).
+    try {
+      await GoogleSignIn().signOut();
+      await GoogleSignIn().disconnect();
+    } catch (e) {
+      debugPrint('CloudService.signOut google: $e');
     }
   }
 
@@ -305,7 +349,7 @@ class CloudService {
     if (!hasSession) return null;
     final item = {
       'type': isDaily ? 'daily' : 'practice',
-      'date': _todayStr(),
+      'date': _todayStrIst(), // Use IST date to match server (C4 fix)
       'score': score,
     };
     try {
