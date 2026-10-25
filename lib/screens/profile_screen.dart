@@ -76,10 +76,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _navigateToEditProfile() async {
+    final isGoogleUser = _user.email.isNotEmpty &&
+        (_user.phone.isEmpty || _user.phone == _user.email.split('@').first);
+
     final updated = await Navigator.push<UserModel>(
       context,
       MaterialPageRoute(
-        builder: (context) => EditProfileScreen(user: _user),
+        builder: (context) => EditProfileScreen(user: _user, isGoogleUser: isGoogleUser),
       ),
     );
 

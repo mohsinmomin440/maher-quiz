@@ -10,6 +10,11 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    AuthService.testing = true;
+  });
+
+  tearDown(() {
+    AuthService.testing = false;
   });
 
   group('AuthService & User Lookup Tests', () {

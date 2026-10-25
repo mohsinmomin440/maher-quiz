@@ -1,47 +1,29 @@
-# Flutter/Dart
-.dart_tool/
-.packages
-.pub-cache/
-.pub/
+# FlutterGen / Build outputs
 build/
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
 
-# Android
-android/local.properties
-android/key.properties
-android/app/google-services.json
-android/.kotlin/
-*.apk
-*.aab
-*.jks
-*.keystore
-
-# Temporary files
-diff.txt
-
-# iOS
-ios/Flutter/Generated.xcconfig
-ios/Flutter/flutter_export_environment.sh
-ios/Flutter/Flutter.podspec
-ios/ServiceDefinitions.json
-Pods/
-.symlinks/
-*.ipa
-
-# Windows
-windows/flutter/ephemeral/
-build/windows/
-
-# Web
-build/web/
-
-# Prebuilt binaries & artifacts
-*.exe
-*.log
-
-# Project specific
+# Supabase config - never commit real credentials
 supabase.json
-.env
-*.iml
-.idea/
-.vscode/
-.DS_Store
+
+# User-specific files
+.shared_preferences/
+
+# IDE / OS files
+*.pidb
+*.iws
+
+# Binary / screenshot files that should not be versioned
+problem.jpeg
+problem.png
+
+# Dart/Flutter cache
+.dart_tool/
+.gen/
+
+# Localization / generated files
+**.g.dart
+**.freezed.dart
+
+# Keep the gitignore itself minimal - only exclude things that must not go to repo

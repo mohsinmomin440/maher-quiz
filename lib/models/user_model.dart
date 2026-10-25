@@ -7,6 +7,8 @@ class UserModel {
   final String phone;
   final String ageGroup;
   final String role; // 'admin' or 'student'
+  /// Authentication source: 'local' (password), 'google' (OAuth), or 'phone' (OTP)
+  final String authSource; // 'local' | 'google' | 'phone'
   final String createdAt;
   final String status; // 'active' or 'suspended'
   final int streak;
@@ -25,7 +27,10 @@ class UserModel {
   // must choose a new password before using the app.
   final bool mustChangePassword;
 
-  UserModel({
+  /// Authentication source: 'local' (password), 'google' (OAuth), or 'phone' (OTP)
+  /// Defaults to 'local' for existing users during migration
+
+UserModel({
     required this.id,
     required this.name,
     this.email = '',
@@ -44,6 +49,7 @@ class UserModel {
     this.bestStreak = 0,
     this.dailyStartedDate,
     this.mustChangePassword = false,
+    this.authSource = 'local',
   }) : createdAt = createdAt ?? DateTime.now().toIso8601String().substring(0, 10);
 
   bool get isAdmin => role == 'admin';
