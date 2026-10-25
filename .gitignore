@@ -12,6 +12,11 @@ android/app/google-services.json
 android/.kotlin/
 *.apk
 *.aab
+*.jks
+*.keystore
+
+# Temporary files
+diff.txt
 
 # iOS
 ios/Flutter/Generated.xcconfig
