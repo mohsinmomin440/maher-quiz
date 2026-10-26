@@ -27,10 +27,7 @@ class UserModel {
   // must choose a new password before using the app.
   final bool mustChangePassword;
 
-  /// Authentication source: 'local' (password), 'google' (OAuth), or 'phone' (OTP)
-  /// Defaults to 'local' for existing users during migration
-
-UserModel({
+  UserModel({
     required this.id,
     required this.name,
     this.email = '',
@@ -75,6 +72,7 @@ UserModel({
       'phone': phone,
       'ageGroup': ageGroup,
       'role': role,
+      'authSource': authSource,
       'createdAt': createdAt,
       'status': status,
       'streak': streak,
@@ -98,6 +96,7 @@ UserModel({
       phone: map['phone'] ?? '',
       ageGroup: map['ageGroup'] ?? 'General / Adult',
       role: map['role'] ?? 'student',
+      authSource: map['authSource'] ?? 'local',
       createdAt: map['createdAt'] ?? DateTime.now().toIso8601String().substring(0, 10),
       status: map['status'] ?? 'active',
       streak: map['streak'] ?? 0,
@@ -137,6 +136,7 @@ UserModel({
     int? bestStreak,
     String? dailyStartedDate,
     bool? mustChangePassword,
+    String? authSource,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -157,6 +157,7 @@ UserModel({
       bestStreak: bestStreak ?? this.bestStreak,
       dailyStartedDate: dailyStartedDate ?? this.dailyStartedDate,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
+      authSource: authSource ?? this.authSource,
     );
   }
 }

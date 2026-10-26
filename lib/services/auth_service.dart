@@ -1,4 +1,4 @@
-x1import 'dart:convert';
+import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -17,9 +17,7 @@ class AuthService {
   static const String _defaultAdminPassword = 'Admin@786';
 
   // For testing: allows re-seeding when tests clear SharedPreferences
-  /// Flag used only during testing to prevent re-seeding on every run.
-/// In production this should always remain false.
-static bool _testing = false;
+  static bool _testing = false;
   static set testing(bool value) => _testing = value;
 
   // Secure Password Hashing with SHA-256

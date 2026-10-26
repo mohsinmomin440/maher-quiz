@@ -122,32 +122,55 @@ class CloudService {
       final auth = await account.authentication;
       if (auth.idToken == null) return const CloudAuthResult.failure('signup_failed');
 
-      await _client.auth.signInWithIdToken(
-        provider: OAuthProvider.google,
-        idToken: auth.idToken!,
-        accessToken: auth.accessToken,
-      );
-      final user = await _loadProfileAndCache(importLegacy: true);
-      return user == null
-          ? const CloudAuthResult.failure('profile_missing')
-          : CloudAuthResult.success(user);
+      if (isEnabled) {
+        await _client.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: auth.idToken!,
+          accessToken: auth.accessToken,
+        );
+        final user = await _loadProfileAndCache(importLegacy: true);
+        return user == null
+            ? const CloudAuthResult.failure('profile_missing')
+            : CloudAuthResult.success(user.copyWith(authSource: 'google'));
+      } else {
+        // Fallback for offline / local mode when Supabase is not configured
+        final email = account.email.toLowerCase().trim();
+        final name = (account.displayName != null && account.displayName!.trim().isNotEmpty)
+            ? account.displayName!.trim()
+            : 'Student';
+        final photo = account.photoUrl ?? '';
+        final localUser = UserModel(
+          id: 'MHR-G${account.id.length >= 6 ? account.id.substring(account.id.length - 6) : account.id}',
+          name: name,
+          email: email,
+          phone: '',
+          avatar: photo,
+          ageGroup: 'General / Adult',
+          role: 'student',
+          authSource: 'google',
+        );
+        await AuthService.cacheCloudUser(localUser);
+        return CloudAuthResult.success(localUser);
+      }
     } on AuthException catch (e) {
       final msg = e.message.toLowerCase();
       if (msg.contains('invalid')) return const CloudAuthResult.failure('invalid_credentials');
       if (msg.contains('confir')) return const CloudAuthResult.failure('email_not_confirmed');
       debugPrint('CloudService.signInWithGoogle: $e');
       return const CloudAuthResult.failure('network');
-    } catch (_) {
+    } catch (e) {
+      debugPrint('CloudService.signInWithGoogle error: $e');
       return const CloudAuthResult.failure('network');
     }
   }
 
   static Future<void> signOut() async {
-    if (!isEnabled) return;
-    try {
-      await _client.auth.signOut();
-    } catch (e) {
-      debugPrint('CloudService.signOut: $e');
+    if (isEnabled) {
+      try {
+        await _client.auth.signOut();
+      } catch (e) {
+        debugPrint('CloudService.signOut: $e');
+      }
     }
     // Sign out of Google so the next "Continue with Google" doesn't
     // silently reuse the previous account (fixes G3).
