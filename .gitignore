@@ -13,6 +13,18 @@ supabase.json
 # IDE / OS files
 *.pidb
 *.iws
+.idea/
+.vscode/
+*.iml
+
+# Build artifacts
+*.apk
+*.aab
+*.ipa
+release-keystore.jks
+
+# Platform credentials
+android/app/google-services.json
 
 # Binary / screenshot files that should not be versioned
 problem.jpeg
