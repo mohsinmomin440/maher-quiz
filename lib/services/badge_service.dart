@@ -15,11 +15,16 @@ class BadgeService {
     final jumuahUnlocked = prefs.getBool(jumuahKey) ?? false;
 
     // Check if today or last quiz was on a Friday (DateTime.friday == 5)
+    // Parse lastQuizDate using IST offset (+05:30) so midnight rollover in UTC
+    // doesn't incorrectly shift the day-of-week.
     bool hasPlayedOnFriday = jumuahUnlocked;
     if (!hasPlayedOnFriday && user.lastQuizDate != null) {
       try {
-        final parsed = DateTime.parse(user.lastQuizDate!);
-        if (parsed.weekday == DateTime.friday) {
+        // lastQuizDate is stored as local date string (yyyy-MM-dd) in IST.
+        // Parse as UTC midnight then add IST offset to get the correct weekday.
+        final utcMidnight = DateTime.parse('${user.lastQuizDate}T00:00:00Z');
+        final ist = utcMidnight.add(const Duration(hours: 5, minutes: 30));
+        if (ist.weekday == DateTime.friday) {
           hasPlayedOnFriday = true;
           await prefs.setBool(jumuahKey, true);
         }
