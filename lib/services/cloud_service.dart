@@ -127,7 +127,10 @@ class CloudService {
       final account = await gs.signIn();
       if (account == null) return const CloudAuthResult.failure('cancelled');
       final auth = await account.authentication;
-      if (auth.idToken == null) return const CloudAuthResult.failure('signup_failed');
+      if (auth.idToken == null) {
+        debugPrint('CloudService.signInWithGoogle: auth.idToken is null');
+        return const CloudAuthResult.failure('google_sign_in_failed');
+      }
 
       if (isEnabled) {
         await _client.auth.signInWithIdToken(
@@ -161,13 +164,20 @@ class CloudService {
       }
     } on AuthException catch (e) {
       final msg = e.message.toLowerCase();
+      debugPrint('CloudService.signInWithGoogle AuthException: $e');
       if (msg.contains('invalid')) return const CloudAuthResult.failure('invalid_credentials');
       if (msg.contains('confir')) return const CloudAuthResult.failure('email_not_confirmed');
-      debugPrint('CloudService.signInWithGoogle: $e');
-      return const CloudAuthResult.failure('network');
+      if (msg.contains('network') || msg.contains('timeout') || msg.contains('connection')) {
+        return const CloudAuthResult.failure('network');
+      }
+      return const CloudAuthResult.failure('google_sign_in_failed');
     } catch (e) {
       debugPrint('CloudService.signInWithGoogle error: $e');
-      return const CloudAuthResult.failure('network');
+      final errStr = e.toString().toLowerCase();
+      if (errStr.contains('socket') || errStr.contains('network') || errStr.contains('timeout') || errStr.contains('failed host lookup')) {
+        return const CloudAuthResult.failure('network');
+      }
+      return const CloudAuthResult.failure('google_sign_in_failed');
     }
   }
 
@@ -331,7 +341,31 @@ class CloudService {
         .from('profiles')
         .select()
         .eq('id', authUser.id)
-        .single();
+        .maybeSingle();
+
+    if (profile == null) {
+      final rawMeta = authUser.userMetadata ?? {};
+      final name = (rawMeta['name'] as String?)?.trim().isNotEmpty == true
+          ? (rawMeta['name'] as String).trim()
+          : (rawMeta['full_name'] as String?)?.trim().isNotEmpty == true
+              ? (rawMeta['full_name'] as String).trim()
+              : (email.contains('@') ? email.split('@').first : 'Student');
+      final memberCode = 'MHR-${authUser.id.replaceAll('-', '').substring(0, 6).toUpperCase()}';
+      final newProfile = {
+        'id': authUser.id,
+        'member_code': memberCode,
+        'name': name.length > 60 ? name.substring(0, 60) : name,
+        'age_group': 'General / Adult',
+        'role': 'student',
+      };
+      try {
+        await _client.from('profiles').upsert(newProfile);
+        profile = await _client.from('profiles').select().eq('id', authUser.id).maybeSingle() ?? newProfile;
+      } catch (err) {
+        debugPrint('CloudService: profile upsert fallback: $err');
+        profile = newProfile;
+      }
+    }
 
     final memberCode = (profile['member_code'] as String?) ?? '';
     final legacy = await AuthService.findLocalUserByEmail(email);
@@ -356,6 +390,7 @@ class CloudService {
 
     // Keep local-only fields (avatar, phone, daily lock) from the local copy,
     // whether that is the existing mirror or the old local account
+    if (profile == null) return null;
     final user = _profileToUser(profile, email, localCopy: legacy);
     await AuthService.cacheCloudUser(user, legacyLocalId: hasLegacy ? legacy.id : null);
     await _syncBookmarks();

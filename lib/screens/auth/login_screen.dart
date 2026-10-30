@@ -51,17 +51,16 @@ class _LoginScreenState extends State<LoginScreen> {
         case 'cancelled':
           // User closed Google prompt — no error message needed
           break;
-        case 'invalid_credentials':
-          setState(() => _errorMessage = AppLocalization.tr('google_sign_in_failed'));
-          break;
         case 'email_not_confirmed':
           setState(() => _errorMessage = AppLocalization.tr('email_not_confirmed'));
           break;
         case 'network':
-        case 'signup_failed':
-        case 'profile_missing':
           setState(() => _errorMessage = AppLocalization.tr('network_error'));
           break;
+        case 'invalid_credentials':
+        case 'signup_failed':
+        case 'google_sign_in_failed':
+        case 'profile_missing':
         default:
           setState(() => _errorMessage = AppLocalization.tr('google_sign_in_failed'));
       }
