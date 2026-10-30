@@ -82,7 +82,7 @@ class LeaderboardService {
           if (cmpToday != 0) return cmpToday;
           final cmpScore = b.lastQuizScore.compareTo(a.lastQuizScore);
           if (cmpScore != 0) return cmpScore;
-          return b.totalScore.compareTo(a.totalScore);
+          return b.effectiveStreak.compareTo(a.effectiveStreak);
         });
         break;
     }
