@@ -240,6 +240,49 @@ class AuthService {
     return null;
   }
 
+  /// Instant Guest Login (zero friction, fully local).
+  /// Reuses existing guest profile on device if available, otherwise creates a new one.
+  static Future<UserModel> loginAsGuest() async {
+    await ensureSeeded();
+    final prefs = await SharedPreferences.getInstance();
+
+    final usersStr = prefs.getString(_usersDbKey);
+    Map<String, dynamic> users = {};
+    if (usersStr != null) {
+      try {
+        users = json.decode(usersStr) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+
+    UserModel? existingGuest;
+    for (final val in users.values) {
+      if (val is Map<String, dynamic>) {
+        final u = UserModel.fromMap(val);
+        if (u.authSource == 'guest' && u.status == 'active') {
+          existingGuest = u;
+          break;
+        }
+      }
+    }
+
+    final guestUser = existingGuest ??
+        UserModel(
+          id: _generateUserId(users),
+          name: 'Guest Student',
+          email: '',
+          phone: '',
+          ageGroup: 'General / Adult',
+          role: 'student',
+          authSource: 'guest',
+        );
+
+    users[guestUser.id] = guestUser.toMap();
+    await prefs.setString(_usersDbKey, json.encode(users));
+    await prefs.setString(_userKey, guestUser.toJson());
+    await prefs.remove(_sessionTemporaryKey);
+    return guestUser;
+  }
+
   // Random member ID (e.g. MHR-7KQ2XP), unique among existing users. The
   // alphabet skips look-alike characters (0/O, 1/I).
   static String _generateUserId(Map<String, dynamic> users) {
