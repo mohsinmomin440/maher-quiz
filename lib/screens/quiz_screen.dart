@@ -33,7 +33,7 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _isQuizCompleted = false;
   bool _isFinishing = false;
   Set<String> _bookmarkedIds = {};
-  String _lang = 'gu';
+  static const String _lang = 'gu';
   bool _wrongAnswersSaved = false;
 
   final List<_AnswerRecord> _userAnswers = [];
@@ -41,17 +41,10 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLanguage();
     _loadBookmarks();
     if (widget.isDaily && widget.questions.isNotEmpty) {
       // Fire-and-forget: locking the daily quiz must not block the first frame.
       unawaited(AuthService.markDailyStarted());
-    }
-  }
-
-  Future<void> _loadLanguage() async {
-    if (mounted) {
-      setState(() => _lang = 'gu');
     }
   }
 
@@ -210,7 +203,11 @@ class _QuizScreenState extends State<QuizScreen> {
     // A daily attempt counts once opened: submit what was earned so far
     if (widget.isDaily && !_isFinishing) {
       setState(() => _isFinishing = true);
-      await AuthService.recordQuizCompletion(score: _score, isDaily: true);
+      try {
+        await AuthService.recordQuizCompletion(score: _score, isDaily: true);
+      } catch (_) {
+        if (mounted) setState(() => _isFinishing = false);
+      }
       if (!mounted) return;
     }
     Navigator.pop(context, widget.isDaily);
