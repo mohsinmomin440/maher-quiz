@@ -451,6 +451,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildHeroProfileHeader(),
                 const SizedBox(height: 18),
 
+                // Guest Account Upgrade Banner
+                if (_user.isGuest) ...[
+                  _buildGuestUpgradeBanner(),
+                  const SizedBox(height: 18),
+                ],
+
                 // Gamified 3-Metric Stats Bento
                 _buildGamifiedStatsBento(),
                 const SizedBox(height: 20),
@@ -461,11 +467,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _buildAccountDetailsCard(),
                 const SizedBox(height: 20),
 
-                // Grouped Inset Section: Security & Credentials
-                _buildSectionHeader('SECURITY'),
-                const SizedBox(height: 8),
-                _buildSecurityCard(),
-                const SizedBox(height: 20),
+                // Grouped Inset Section: Security & Credentials (Only for local password accounts)
+                if (_user.authSource == 'local') ...[
+                  _buildSectionHeader('SECURITY'),
+                  const SizedBox(height: 8),
+                  _buildSecurityCard(),
+                  const SizedBox(height: 20),
+                ],
 
                 // Grouped Inset Section: Preferences & Bookmarks
                 _buildSectionHeader('PREFERENCES & TOOLS'),
@@ -835,6 +843,90 @@ class _ProfileScreenState extends State<ProfileScreen> {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Guest Account Upgrade Banner
+  Widget _buildGuestUpgradeBanner() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: MaherTheme.goldLight.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: MaherTheme.goldDark.withValues(alpha: 0.35),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: MaherIcons.get('guest', size: 24, color: MaherTheme.goldDark),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  AppLocalization.tr('guest_welcome'),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: MaherTheme.goldDark,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  AppLocalization.tr('guest_account_notice'),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.black87.withValues(alpha: 0.75),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: MaherTheme.emeraldPrimary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              elevation: 0,
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              );
+            },
+            child: Text(
+              AppLocalization.tr('connect_account'),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
