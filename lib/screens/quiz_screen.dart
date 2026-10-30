@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/age_groups.dart';
 import '../models/question_model.dart';
 import '../services/auth_service.dart';
 import '../services/badge_service.dart';
@@ -43,7 +45,8 @@ class _QuizScreenState extends State<QuizScreen> {
     _loadLanguage();
     _loadBookmarks();
     if (widget.isDaily && widget.questions.isNotEmpty) {
-      AuthService.markDailyStarted();
+      // Fire-and-forget: locking the daily quiz must not block the first frame.
+      unawaited(AuthService.markDailyStarted());
     }
   }
 
@@ -379,13 +382,15 @@ class _QuizScreenState extends State<QuizScreen> {
       categoryDisplay = categoryDisplay.split('/').last.trim();
     }
 
-    // Clean English Age Group display
-    String ageGroupDisplay = currentQ.ageGroup;
-    if (ageGroupDisplay.contains('4') || ageGroupDisplay.contains('7')) {
+    // Clean English Age Group display. The bank stores Gujarati labels
+    // (e.g. '૪ થી ૭ વર્ષ'), so map them via AgeGroups.normalize first.
+    final normalizedAgeGroup = AgeGroups.normalize(currentQ.ageGroup);
+    String ageGroupDisplay = normalizedAgeGroup;
+    if (normalizedAgeGroup.startsWith(AgeGroups.class1)) {
       ageGroupDisplay = 'Ages 4-7';
-    } else if (ageGroupDisplay.contains('12') || ageGroupDisplay.contains('14')) {
+    } else if (normalizedAgeGroup.startsWith(AgeGroups.class3)) {
       ageGroupDisplay = 'Ages 12-14';
-    } else {
+    } else if (normalizedAgeGroup.startsWith(AgeGroups.class2)) {
       ageGroupDisplay = 'Ages 8-11';
     }
 
@@ -650,7 +655,7 @@ class _QuizScreenState extends State<QuizScreen> {
                                 ),
                               ),
                             ),
-                            ?trailingIcon,
+                            trailingIcon ?? const SizedBox(),
                           ],
                         ),
                       ),
@@ -929,8 +934,8 @@ class _QuizScreenState extends State<QuizScreen> {
                     color: MaherTheme.emeraldPrimary,
                   ),
                   label: Text(_wrongAnswersSaved
-                      ? 'Wrong answers saved for revision'
-                      : 'Save wrong answers to revise later'),
+                      ? AppLocalization.tr('wrong_answers_saved')
+                      : AppLocalization.tr('save_wrong_answers')),
                   onPressed: _wrongAnswersSaved ? null : _saveWrongAnswers,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -944,7 +949,7 @@ class _QuizScreenState extends State<QuizScreen> {
               OutlinedButton.icon(
                 icon: const Icon(Icons.copy_rounded,
                     size: 18, color: MaherTheme.emeraldPrimary),
-                label: const Text('Copy result to share'),
+                label: Text(AppLocalization.tr('copy_result')),
                 onPressed: _copyResult,
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -987,16 +992,16 @@ class _QuizScreenState extends State<QuizScreen> {
   Future<void> _copyResult() async {
     final total = widget.questions.length;
     final marks =
-        _userAnswers.map((a) => a.isCorrect ? '✅' : '❌').join(' ');
+        _userAnswers.map((a) => a.isCorrect ? 'O' : 'X').join(' ');
     final title = widget.isDaily ? 'Daily Quiz' : 'Practice Quiz';
-    final text = 'Maher Quiz – $title\n'
+    final text = 'Maher Quiz - $title\n'
         'MashaAllah! I scored $_score / $total\n'
         '$marks';
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Result copied. Paste it in WhatsApp to share!'),
+      SnackBar(
+        content: Text(AppLocalization.tr('result_copied')),
         backgroundColor: MaherTheme.emeraldPrimary,
       ),
     );
