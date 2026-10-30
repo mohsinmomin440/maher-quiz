@@ -367,156 +367,69 @@ class MaherIcons {
 </svg>
 ''';
 
+  // Pre-computed map for O(1) icon lookup instead of switch statement.
+  // Logo is handled specially since it returns a different widget type.
+  static const Map<String, String> _iconMap = {
+    'home': _homeSvg,
+    'home-outline': _homeOutlineSvg,
+    'crescent-star': _crescentStarSvg,
+    'mosque': _mosqueSvg,
+    'book-quran': _quranBookSvg,
+    'timer-clock': _timerClockSvg,
+    'flame-streak': _flameStreakSvg,
+    'trophy': _trophySvg,
+    'check-circle': _checkCircleSvg,
+    'cross-circle': _crossCircleSvg,
+    'user': _userSvg,
+    'users-group': _usersGroupSvg,
+    'lock': _lockSvg,
+    'mail': _mailSvg,
+    'globe': _globeSvg,
+    'rub-el-hizb': _rubElHizbSvg,
+    'eye': _eyeSvg,
+    'eye-off': _eyeOffSvg,
+    'shield-check': _shieldCheckSvg,
+    'shield-alert': _shieldAlertSvg,
+    'refresh': _refreshSvg,
+    'sparkle': _sparkleSvg,
+    'chevron-right': _chevronRightSvg,
+    'arrow-left': _arrowLeftSvg,
+    'logout': _logoutSvg,
+    'search': _searchSvg,
+    'trash': _trashSvg,
+    'key': _keySvg,
+    'admin-crown': _adminCrownSvg,
+    'crown-gold': _crownGoldSvg,
+    'medal-silver': _medalSilverSvg,
+    'medal-bronze': _medalBronzeSvg,
+    'bookmark': _bookmarkFilledSvg,
+    'bookmark-filled': _bookmarkFilledSvg,
+    'bookmark-outline': _bookmarkOutlineSvg,
+    'star-islamic': _starIslamicSvg,
+    'badge-verified': _badgeVerifiedSvg,
+    'chart-bar': _chartBarSvg,
+    'student-cap': _studentCapSvg,
+    'pencil': _pencilSvg,
+    'edit': _pencilSvg,
+    'camera': _cameraSvg,
+    'phone': _phoneSvg,
+    'kaaba': _kaabaSvg,
+    'google': _googleSvg,
+    'apple': _appleSvg,
+    'guest': _guestSvg,
+  };
+
   // SVG Helper Widget Factory
   static Widget get(
     String iconName, {
     double size = 24.0,
     Color? color,
   }) {
-    String rawSvg;
-    switch (iconName) {
-      case 'logo':
-        return SvgPicture.string(_maherLogoSvg, width: size, height: size);
-      case 'home':
-        rawSvg = _homeSvg;
-        break;
-      case 'home-outline':
-        rawSvg = _homeOutlineSvg;
-        break;
-      case 'crescent-star':
-        rawSvg = _crescentStarSvg;
-        break;
-      case 'mosque':
-        rawSvg = _mosqueSvg;
-        break;
-      case 'book-quran':
-        rawSvg = _quranBookSvg;
-        break;
-      case 'timer-clock':
-        rawSvg = _timerClockSvg;
-        break;
-      case 'flame-streak':
-        rawSvg = _flameStreakSvg;
-        break;
-      case 'trophy':
-        rawSvg = _trophySvg;
-        break;
-      case 'check-circle':
-        rawSvg = _checkCircleSvg;
-        break;
-      case 'cross-circle':
-        rawSvg = _crossCircleSvg;
-        break;
-      case 'user':
-        rawSvg = _userSvg;
-        break;
-      case 'users-group':
-        rawSvg = _usersGroupSvg;
-        break;
-      case 'lock':
-        rawSvg = _lockSvg;
-        break;
-      case 'mail':
-        rawSvg = _mailSvg;
-        break;
-      case 'globe':
-        rawSvg = _globeSvg;
-        break;
-      case 'rub-el-hizb':
-        rawSvg = _rubElHizbSvg;
-        break;
-      case 'eye':
-        rawSvg = _eyeSvg;
-        break;
-      case 'eye-off':
-        rawSvg = _eyeOffSvg;
-        break;
-      case 'shield-check':
-        rawSvg = _shieldCheckSvg;
-        break;
-      case 'shield-alert':
-        rawSvg = _shieldAlertSvg;
-        break;
-      case 'refresh':
-        rawSvg = _refreshSvg;
-        break;
-      case 'sparkle':
-        rawSvg = _sparkleSvg;
-        break;
-      case 'chevron-right':
-        rawSvg = _chevronRightSvg;
-        break;
-      case 'arrow-left':
-        rawSvg = _arrowLeftSvg;
-        break;
-      case 'logout':
-        rawSvg = _logoutSvg;
-        break;
-      case 'search':
-        rawSvg = _searchSvg;
-        break;
-      case 'trash':
-        rawSvg = _trashSvg;
-        break;
-      case 'key':
-        rawSvg = _keySvg;
-        break;
-      case 'admin-crown':
-        rawSvg = _adminCrownSvg;
-        break;
-      case 'crown-gold':
-        rawSvg = _crownGoldSvg;
-        break;
-      case 'medal-silver':
-        rawSvg = _medalSilverSvg;
-        break;
-      case 'medal-bronze':
-        rawSvg = _medalBronzeSvg;
-        break;
-      case 'bookmark':
-      case 'bookmark-filled':
-        rawSvg = _bookmarkFilledSvg;
-        break;
-      case 'bookmark-outline':
-        rawSvg = _bookmarkOutlineSvg;
-        break;
-      case 'star-islamic':
-        rawSvg = _starIslamicSvg;
-        break;
-      case 'badge-verified':
-        rawSvg = _badgeVerifiedSvg;
-        break;
-      case 'chart-bar':
-        rawSvg = _chartBarSvg;
-        break;
-      case 'student-cap':
-        rawSvg = _studentCapSvg;
-        break;
-      case 'pencil':
-      case 'edit':
-        rawSvg = _pencilSvg;
-        break;
-      case 'camera':
-        rawSvg = _cameraSvg;
-        break;
-      case 'phone':
-        rawSvg = _phoneSvg;
-        break;
-      case 'kaaba':
-        rawSvg = _kaabaSvg;
-        break;
-      case 'google':
-        rawSvg = _googleSvg;
-        break;
-      case 'apple':
-        rawSvg = _appleSvg;
-        break;
-      case 'guest':
-        rawSvg = _guestSvg;
-        break;
-      default:
-        rawSvg = _rubElHizbSvg;
+    if (iconName == 'logo') {
+      return SvgPicture.string(_maherLogoSvg, width: size, height: size);
     }
+
+    final rawSvg = _iconMap[iconName] ?? _rubElHizbSvg;
 
     return SvgPicture.string(
       rawSvg,
