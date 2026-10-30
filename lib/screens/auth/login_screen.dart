@@ -1,4 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
+import '../../services/auth_service.dart';
 import '../../services/cloud_service.dart';
 import '../../utils/app_localization.dart';
 import '../../utils/maher_icons.dart';
@@ -14,7 +17,31 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
+  bool _showAppleSignIn = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAppleSignInAvailability();
+  }
+
+  Future<void> _checkAppleSignInAvailability() async {
+    if (kIsWeb) return;
+    if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      try {
+        final available = await SignInWithApple.isAvailable();
+        if (mounted) {
+          setState(() => _showAppleSignIn = available);
+        }
+      } catch (_) {
+        if (mounted) {
+          setState(() => _showAppleSignIn = true);
+        }
+      }
+    }
+  }
 
   Future<void> _signInWithGoogle() async {
     setState(() {
@@ -69,6 +96,89 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _isLoading = false;
         _errorMessage = AppLocalization.tr('google_sign_in_failed');
+      });
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await CloudService.signInWithApple();
+
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      if (result.user != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${AppLocalization.tr('login_welcome')}, ${result.user!.name}!'),
+            backgroundColor: MaherTheme.emeraldPrimary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+          (route) => false,
+        );
+        return;
+      }
+
+      switch (result.error) {
+        case 'cancelled':
+          break;
+        case 'network':
+        case 'signup_failed':
+        case 'profile_missing':
+          setState(() => _errorMessage = AppLocalization.tr('network_error'));
+          break;
+        default:
+          setState(() => _errorMessage = AppLocalization.tr('apple_sign_in_failed'));
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = AppLocalization.tr('apple_sign_in_failed');
+      });
+    }
+  }
+
+  Future<void> _playAsGuest() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await AuthService.loginAsGuest();
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalization.tr('guest_welcome')),
+          backgroundColor: MaherTheme.goldDark,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Could not start guest mode: $e';
       });
     }
   }
@@ -165,7 +275,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 30),
 
                       // Welcome & Feature highlight box
                       Container(
@@ -202,7 +312,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   SizedBox(height: 2),
                                   Text(
-                                    'Sign in with your Google account to track streaks, save scores, and compete on the leaderboard.',
+                                    'Sign in or play instantly to test your knowledge, track streaks, and learn Deeniyat.',
                                     style: TextStyle(
                                       fontSize: 11.5,
                                       color: MaherTheme.textSecondaryLight,
@@ -215,7 +325,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 24),
 
                       // Error Banner if any
                       if (_errorMessage != null) ...[
@@ -245,17 +355,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
                       ],
 
-                      // Google Sign-In Button
+                      // 1. Google Sign-In Button
                       Material(
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: _isLoading ? null : _signInWithGoogle,
                           borderRadius: BorderRadius.circular(16),
                           child: Ink(
-                            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 16),
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
@@ -291,13 +401,112 @@ class _LoginScreenState extends State<LoginScreen> {
                                       Text(
                                         AppLocalization.tr('continue_with_google'),
                                         style: const TextStyle(
-                                          fontSize: 16,
+                                          fontSize: 15.5,
                                           fontWeight: FontWeight.w600,
                                           color: Colors.black87,
                                         ),
                                       ),
                                     ],
                                   ),
+                          ),
+                        ),
+                      ),
+
+                      // 2. Apple Sign-In Button (iOS / macOS native)
+                      if (_showAppleSignIn) ...[
+                        const SizedBox(height: 12),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _isLoading ? null : _signInWithApple,
+                            borderRadius: BorderRadius.circular(16),
+                            child: Ink(
+                              padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.black,
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    offset: Offset(0, 3),
+                                    blurRadius: 6,
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  MaherIcons.get('apple', size: 22, color: Colors.white),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    AppLocalization.tr('continue_with_apple'),
+                                    style: const TextStyle(
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+
+                      // OR Divider
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 14),
+                            child: Text(
+                              AppLocalization.tr('or_continue_with'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey.shade500,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                          Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 3. Play as Guest Button (100% SVG icon, no emojis)
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _isLoading ? null : _playAsGuest,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Ink(
+                            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: MaherTheme.emeraldPrimary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: MaherTheme.emeraldPrimary.withValues(alpha: 0.35),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                MaherIcons.get('guest', size: 22, color: MaherTheme.emeraldDark),
+                                const SizedBox(width: 12),
+                                Text(
+                                  AppLocalization.tr('play_as_guest'),
+                                  style: const TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: MaherTheme.emeraldDark,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
