@@ -110,11 +110,17 @@ class CloudService {
     }
   }
 
+  /// Web Client ID from Google Cloud Console / google-services.json
+  /// Used so Google Play Services returns a valid idToken for Supabase verification.
+  static const String _googleServerClientId =
+      '910141013939-5d945hie2ghp1jbo5oldovmn9ponn4qg.apps.googleusercontent.com';
+
   /// Signs in to Supabase using a Google ID token obtained from GoogleSignIn.
   /// This avoids Firebase entirely for the Google flow.
   static Future<CloudAuthResult> signInWithGoogle() async {
     try {
       final gs = GoogleSignIn(
+        serverClientId: _googleServerClientId,
         scopes: ['email', 'profile'],
       );
       final account = await gs.signIn();
@@ -222,6 +228,9 @@ class CloudService {
       // The recovery flow signs the user in; leave them on the login screen
       await _client.auth.signOut();
       return true;
+    } on AuthException catch (e) {
+      debugPrint('CloudService.resetPasswordWithCode: $e');
+      return false;
     } catch (e) {
       debugPrint('CloudService.resetPasswordWithCode: $e');
       return false;
@@ -247,6 +256,9 @@ class CloudService {
     try {
       await _client.auth.updateUser(UserAttributes(password: newPassword));
       return null;
+    } on AuthException catch (e) {
+      debugPrint('CloudService.changePassword: $e');
+      return 'network_error';
     } catch (e) {
       debugPrint('CloudService.changePassword: $e');
       return 'network_error';
@@ -277,9 +289,10 @@ class CloudService {
 
   static UserModel _profileToUser(Map<String, dynamic> p, String email,
       {UserModel? localCopy}) {
-    final base = localCopy ?? UserModel(id: p['member_code'] as String, name: '');
+    final memberCode = (p['member_code'] as String?) ?? '';
+    final base = localCopy ?? UserModel(id: memberCode, name: '');
     return base.copyWith(
-      id: p['member_code'] as String,
+      id: memberCode,
       name: (p['name'] as String?) ?? '',
       email: email,
       ageGroup: (p['age_group'] as String?) ?? 'General / Adult',
@@ -318,7 +331,7 @@ class CloudService {
         .eq('id', authUser.id)
         .single();
 
-    final memberCode = profile['member_code'] as String;
+    final memberCode = (profile['member_code'] as String?) ?? '';
     final legacy = await AuthService.findLocalUserByEmail(email);
     final hasLegacy = legacy != null && legacy.id != memberCode;
 
