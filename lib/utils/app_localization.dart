@@ -518,6 +518,9 @@ class AppLocalization {
   };
 
   static String tr(String key) {
+    // Always prefer English first; fall back to the current language,
+    // and only return the raw key if neither has it (so missing keys
+    // are visible instead of silently rendering as the key string).
     return _strings['en']?[key] ?? _strings[currentLang]?[key] ?? key;
   }
 }
