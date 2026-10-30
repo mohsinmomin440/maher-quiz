@@ -22,17 +22,12 @@ class SavedQuestionsScreenState extends State<SavedQuestionsScreen> {
 
   List<QuestionModel> _savedQuestions = [];
   bool _isLoading = true;
-  String _lang = 'gu';
+  static const String _lang = 'gu';
 
   @override
   void initState() {
     super.initState();
-    _loadLanguage();
     loadBookmarks();
-  }
-
-  Future<void> _loadLanguage() async {
-    if (mounted) setState(() => _lang = 'gu');
   }
 
   Future<void> loadBookmarks() async {
