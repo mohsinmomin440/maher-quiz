@@ -6,6 +6,7 @@ import '../models/badge_model.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/badge_service.dart';
+import '../services/notification_service.dart';
 import '../services/sound_service.dart';
 import '../utils/app_localization.dart';
 import '../utils/maher_icons.dart';
@@ -37,6 +38,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late UserModel _user;
   List<BadgeModel> _badges = [];
   bool _isSoundEnabled = true;
+  bool _isNotificationsEnabled = true;
 
   @override
   void initState() {
@@ -59,10 +61,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfileData() async {
     final badges = await BadgeService.getUserBadges(_user);
     final sound = await SoundService.isEnabled();
+    final notifs = await NotificationService.isNotificationsEnabled();
     if (mounted) {
       setState(() {
         _badges = badges;
         _isSoundEnabled = sound;
+        _isNotificationsEnabled = notifs;
       });
     }
   }
@@ -72,6 +76,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (!mounted) return;
     setState(() {
       _isSoundEnabled = val;
+    });
+  }
+
+  Future<void> _toggleNotifications(bool val) async {
+    await NotificationService.setNotificationsEnabled(val);
+    if (!mounted) return;
+    setState(() {
+      _isNotificationsEnabled = val;
     });
   }
 
@@ -1146,6 +1158,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
             activeThumbColor: MaherTheme.emeraldPrimary,
             value: _isSoundEnabled,
             onChanged: _toggleSound,
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Divider(height: 1, color: Colors.grey.shade100),
+          ),
+
+          // Daily Quiz Reminders
+          SwitchListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 18, vertical: 4),
+            secondary: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: MaherTheme.emeraldSoft,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                _isNotificationsEnabled
+                    ? Icons.notifications_active_outlined
+                    : Icons.notifications_off_outlined,
+                color: MaherTheme.emeraldPrimary,
+                size: 20,
+              ),
+            ),
+            title: const Text(
+              'Daily Quiz Reminders',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14.5,
+              ),
+            ),
+            subtitle: Text(
+              _isNotificationsEnabled
+                  ? 'Daily 8:00 PM & streak reminders'
+                  : 'Reminders turned off',
+              style: const TextStyle(fontSize: 11.5),
+            ),
+            activeThumbColor: MaherTheme.emeraldPrimary,
+            value: _isNotificationsEnabled,
+            onChanged: _toggleNotifications,
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 18),

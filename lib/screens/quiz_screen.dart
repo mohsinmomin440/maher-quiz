@@ -5,6 +5,7 @@ import '../models/age_groups.dart';
 import '../models/question_model.dart';
 import '../services/auth_service.dart';
 import '../services/badge_service.dart';
+import '../services/notification_service.dart';
 import '../services/bookmark_service.dart';
 import '../services/sound_service.dart';
 import '../utils/app_localization.dart';
@@ -150,6 +151,9 @@ class _QuizScreenState extends State<QuizScreen> {
         score: _score,
         isDaily: widget.isDaily,
       );
+      if (widget.isDaily) {
+        NotificationService.onDailyQuizCompleted();
+      }
       await BadgeService.checkJumuahUnlock();
       SoundService.playVictory();
 
