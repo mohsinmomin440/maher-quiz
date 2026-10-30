@@ -434,6 +434,10 @@ class AppLocalization {
       'excellent': 'Outstanding Performance! MashaAllah!',
       'good_try': 'Good effort! Keep seeking knowledge!',
       'time_remaining': 'Time Left',
+      'wrong_answers_saved': 'Wrong answers saved for revision',
+      'save_wrong_answers': 'Save wrong answers to revise later',
+      'copy_result': 'Copy result to share',
+      'result_copied': 'Result copied. Paste it in WhatsApp to share!',
 
       // Admin Dashboard
       'admin_dashboard': 'Admin Console',
