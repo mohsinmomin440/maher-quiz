@@ -78,12 +78,16 @@ class AuthService {
 
     if (usersStr != null && usersStr.isNotEmpty && usersStr != '{}') {
       try {
-        users = json.decode(usersStr);
+        users = json.decode(usersStr) as Map<String, dynamic>;
         final passStr = prefs.getString(_passwordsDbKey);
         if (passStr != null) {
-          passwords = json.decode(passStr);
+          passwords = json.decode(passStr) as Map<String, dynamic>;
         }
-      } catch (_) {}
+      } catch (_) {
+        // Corrupt store: fall back to empty maps and re-seed below.
+        users = {};
+        passwords = {};
+      }
     }
 
     // Seed a bootstrap admin only when the device has no admin at all (so
@@ -161,7 +165,9 @@ class AuthService {
     final rawInput = (identifier ?? email ?? '').trim();
     final cleanDigits = normalizePhone(rawInput);
     final isPhone = cleanDigits.length == 10 && !rawInput.contains('@');
-    final mappedEmail = isPhone ? cleanDigits : rawInput.toLowerCase().trim();
+    // Phones get a synthetic @maher.app email, matching the format login()
+    // computes for the same number, so sign-up and sign-in use one address.
+    final mappedEmail = isPhone ? '$cleanDigits@maher.app' : rawInput.toLowerCase().trim();
 
     if (CloudService.isEnabled) {
       final res = await CloudService.signUp(
@@ -184,8 +190,11 @@ class AuthService {
     final usersStr = prefs.getString(_usersDbKey);
     if (usersStr != null) {
       try {
-        users = json.decode(usersStr);
-      } catch (_) {}
+        users = json.decode(usersStr) as Map<String, dynamic>;
+      } catch (_) {
+        // Corrupt store: start fresh and re-seed below.
+        users = {};
+      }
     }
 
     // Check if user already exists
@@ -202,8 +211,10 @@ class AuthService {
     final passStr = prefs.getString(_passwordsDbKey);
     if (passStr != null) {
       try {
-        passwords = json.decode(passStr);
-      } catch (_) {}
+        passwords = json.decode(passStr) as Map<String, dynamic>;
+      } catch (_) {
+        passwords = {};
+      }
     }
 
     final newId = _generateUserId(users);
@@ -259,7 +270,7 @@ class AuthService {
     final isPhone = cleanDigits.length == 10 && !identifier.contains('@');
     // Use the same fake email format as register for cloud mode consistency
     final mappedEmail = isPhone
-        ? '$cleanDigits@phone.maher.quiz'
+        ? '$cleanDigits@maher.app'
         : identifier.trim().toLowerCase();
 
     if (CloudService.isEnabled) {
@@ -283,12 +294,22 @@ class AuthService {
     final passStr = prefs.getString(_passwordsDbKey);
     if (passStr == null) return null;
 
-    final Map<String, dynamic> passwords = json.decode(passStr);
+    final Map<String, dynamic> passwords;
+    try {
+      passwords = json.decode(passStr) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
     final inputHash = hashPassword(password);
 
     final usersStr = prefs.getString(_usersDbKey);
     if (usersStr == null) return null;
-    final Map<String, dynamic> users = json.decode(usersStr);
+    final Map<String, dynamic> users;
+    try {
+      users = json.decode(usersStr) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
 
     String? matchedKey;
     UserModel? matchedUser;
@@ -385,20 +406,21 @@ class AuthService {
       try { users = json.decode(usersStr); } catch (_) {}
     }
 
-    // Collect all keys that belong to this user (DB key + email + phone aliases)
+    // Collect every DB key that belongs to this user (the primary key plus any
+    // email/phone aliases used as alternate lookup keys), then also remove
+    // any entry whose stored map matches by id/email/phone.
     final keysToRemove = <String>{
       currentUser.email.toLowerCase(),
       if (currentUser.phone.isNotEmpty) currentUser.phone,
+      currentUser.id,
     };
-    // Also remove any entry whose user map has matching id/email/phone
     for (final entry in users.entries.toList()) {
-      if (entry.value is Map<String, dynamic>) {
-        final u = UserModel.fromMap(entry.value);
-        if (u.id == currentUser.id ||
-            u.email.toLowerCase() == currentUser.email.toLowerCase() ||
-            (currentUser.phone.isNotEmpty && u.phone == currentUser.phone)) {
-          keysToRemove.add(entry.key);
-        }
+      if (entry.value is! Map<String, dynamic>) continue;
+      final u = UserModel.fromMap(entry.value);
+      if (u.id == currentUser.id ||
+          u.email.toLowerCase() == currentUser.email.toLowerCase() ||
+          (currentUser.phone.isNotEmpty && u.phone == currentUser.phone)) {
+        keysToRemove.add(entry.key);
       }
     }
     for (final k in keysToRemove) {
@@ -410,7 +432,7 @@ class AuthService {
     final passStr = prefs.getString(_passwordsDbKey);
     Map<String, dynamic> pass = {};
     if (passStr != null) {
-      try { pass = json.decode(passStr); } catch (_) {}
+      try { pass = json.decode(passStr) as Map<String, dynamic>; } catch (_) { pass = {}; }
     }
     for (final k in keysToRemove) {
       pass.remove(k);
@@ -438,7 +460,8 @@ class AuthService {
     final usersStr = prefs.getString(_usersDbKey);
     if (usersStr == null) return null;
     try {
-      final Map<String, dynamic> users = json.decode(usersStr);
+      final Map<String, dynamic> users =
+          json.decode(usersStr) as Map<String, dynamic>;
       for (final val in users.values) {
         if (val is! Map<String, dynamic>) continue;
         final u = UserModel.fromMap(val);
@@ -458,8 +481,10 @@ class AuthService {
     final usersStr = prefs.getString(_usersDbKey);
     if (usersStr != null) {
       try {
-        users = json.decode(usersStr);
-      } catch (_) {}
+        users = json.decode(usersStr) as Map<String, dynamic>;
+      } catch (_) {
+        users = {};
+      }
     }
     users.removeWhere((key, val) {
       if (val is! Map<String, dynamic>) return false;
@@ -484,6 +509,7 @@ class AuthService {
     'maher_question_lang',
     'maher_daily_progress',
     'maher_cloud_pending',
+    'maher_wrong_answers',
   ];
 
   static Future<void> _migrateScopedPrefs(
@@ -617,7 +643,12 @@ class AuthService {
 
     final usersStr = prefs.getString(_usersDbKey);
     if (usersStr != null) {
-      Map<String, dynamic> users = json.decode(usersStr);
+      final Map<String, dynamic> users;
+      try {
+        users = json.decode(usersStr) as Map<String, dynamic>;
+      } catch (_) {
+        return;
+      }
       String? foundKey;
       for (final entry in users.entries) {
         final u = UserModel.fromMap(entry.value);
@@ -648,7 +679,8 @@ class AuthService {
     if (usersStr == null || usersStr.isEmpty) return [];
 
     try {
-      final Map<String, dynamic> usersMap = json.decode(usersStr);
+      final Map<String, dynamic> usersMap =
+          json.decode(usersStr) as Map<String, dynamic>;
       final Map<String, UserModel> uniqueMap = {};
       for (final val in usersMap.values) {
         if (val is Map<String, dynamic>) {
@@ -669,8 +701,8 @@ class AuthService {
   static MapEntry<String, UserModel>? _findUserEntry(
       Map<String, dynamic> users, String identifier) {
     final normalized = identifier.trim().toLowerCase();
-    final cleanDigits = normalizePhone(normalized);
-    final last10Digits = cleanDigits.length == 10 ? cleanDigits : normalized;
+    final cleanDigits = normalizePhone(identifier);
+    final last10Digits = cleanDigits.length == 10 ? cleanDigits : null;
 
     for (final entry in users.entries) {
       if (entry.value is! Map<String, dynamic>) continue;
@@ -679,7 +711,7 @@ class AuthService {
       if (entry.key.toLowerCase() == normalized ||
           u.email.toLowerCase() == normalized ||
           u.id.toLowerCase() == normalized ||
-          (last10Digits.isNotEmpty &&
+          (last10Digits != null &&
               phoneDigits.isNotEmpty &&
               phoneDigits.endsWith(last10Digits))) {
         return MapEntry(entry.key, u);
@@ -694,7 +726,12 @@ class AuthService {
     final usersStr = prefs.getString(_usersDbKey);
     if (usersStr == null) return false;
 
-    Map<String, dynamic> users = json.decode(usersStr);
+    final Map<String, dynamic> users;
+    try {
+      users = json.decode(usersStr) as Map<String, dynamic>;
+    } catch (_) {
+      return false;
+    }
     final match = _findUserEntry(users, identifier);
     if (match == null) return false;
 
@@ -706,7 +743,12 @@ class AuthService {
 
     final passStr = prefs.getString(_passwordsDbKey);
     if (passStr != null) {
-      Map<String, dynamic> pass = json.decode(passStr);
+      Map<String, dynamic> pass;
+      try {
+        pass = json.decode(passStr) as Map<String, dynamic>;
+      } catch (_) {
+        pass = {};
+      }
       pass.remove(foundKey);
       if (foundUser.email.isNotEmpty) pass.remove(foundUser.email.toLowerCase());
       if (foundUser.phone.isNotEmpty) pass.remove(foundUser.phone);
@@ -729,7 +771,12 @@ class AuthService {
     final usersStr = prefs.getString(_usersDbKey);
     if (usersStr == null) return null;
 
-    Map<String, dynamic> users = json.decode(usersStr);
+    final Map<String, dynamic> users;
+    try {
+      users = json.decode(usersStr) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
     final match = _findUserEntry(users, identifier);
     if (match == null) return null;
 
@@ -751,7 +798,12 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     final usersStr = prefs.getString(_usersDbKey);
     if (usersStr == null) return false;
-    final Map<String, dynamic> users = json.decode(usersStr);
+    final Map<String, dynamic> users;
+    try {
+      users = json.decode(usersStr) as Map<String, dynamic>;
+    } catch (_) {
+      return false;
+    }
 
     final match = _findUserEntry(users, identifier);
     if (match == null) return false;
@@ -763,8 +815,10 @@ class AuthService {
     Map<String, dynamic> passwords = {};
     if (passStr != null) {
       try {
-        passwords = json.decode(passStr);
-      } catch (_) {}
+        passwords = json.decode(passStr) as Map<String, dynamic>;
+      } catch (_) {
+        passwords = {};
+      }
     }
 
     _setPasswordForUser(passwords, foundKey, foundUser, hashPassword(newPass));
@@ -802,7 +856,15 @@ class AuthService {
       );
     }
 
-    Map<String, dynamic> users = json.decode(usersStr);
+    final Map<String, dynamic> users;
+    try {
+      users = json.decode(usersStr) as Map<String, dynamic>;
+    } catch (_) {
+      return const ProfileUpdateResult(
+        success: false,
+        errorMessage: 'Users database not found',
+      );
+    }
     final cleanPhone = normalizePhone(phone);
     final cleanEmail = email.trim().toLowerCase();
 
@@ -894,8 +956,10 @@ class AuthService {
     Map<String, dynamic> passwords = {};
     if (passStr != null) {
       try {
-        passwords = json.decode(passStr);
-      } catch (_) {}
+        passwords = json.decode(passStr) as Map<String, dynamic>;
+      } catch (_) {
+        passwords = {};
+      }
     }
 
     // Migrate password to new key if key changed
@@ -946,7 +1010,15 @@ class AuthService {
       );
     }
 
-    final Map<String, dynamic> users = json.decode(usersStr);
+    final Map<String, dynamic> users;
+    try {
+      users = json.decode(usersStr) as Map<String, dynamic>;
+    } catch (_) {
+      return const PasswordChangeResult(
+        success: false,
+        errorMessage: 'User database not found',
+      );
+    }
     String? matchedKey;
     UserModel? matchedUser;
 
@@ -990,7 +1062,15 @@ class AuthService {
       );
     }
 
-    final Map<String, dynamic> passwords = json.decode(passStr);
+    final Map<String, dynamic> passwords;
+    try {
+      passwords = json.decode(passStr) as Map<String, dynamic>;
+    } catch (_) {
+      return const PasswordChangeResult(
+        success: false,
+        errorMessage: 'Password storage error',
+      );
+    }
     final storedPass = passwords[matchedKey] ??
         passwords[matchedUser.email] ??
         passwords[matchedUser.phone];
