@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/backend_config.dart';
 import '../models/user_model.dart';
@@ -113,7 +114,7 @@ class CloudService {
   /// Web Client ID from Google Cloud Console / google-services.json
   /// Used so Google Play Services returns a valid idToken for Supabase verification.
   static const String _googleServerClientId =
-      '910141013939-5d945hie2ghp1jbo5oldovmn9ponn4qg.apps.googleusercontent.com';
+      '604138202999-bh3q85ra1tj4s12d3hi653s508p80ehk.apps.googleusercontent.com';
 
   /// Signs in to Supabase using a Google ID token obtained from GoogleSignIn.
   /// This avoids Firebase entirely for the Google flow.
@@ -166,6 +167,69 @@ class CloudService {
       return const CloudAuthResult.failure('network');
     } catch (e) {
       debugPrint('CloudService.signInWithGoogle error: $e');
+      return const CloudAuthResult.failure('network');
+    }
+  }
+
+  /// Signs in to Supabase using Apple ID credential from SignInWithApple.
+  static Future<CloudAuthResult> signInWithApple() async {
+    try {
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      final idToken = credential.identityToken;
+      if (idToken == null) {
+        return const CloudAuthResult.failure('signup_failed');
+      }
+
+      if (isEnabled) {
+        await _client.auth.signInWithIdToken(
+          provider: OAuthProvider.apple,
+          idToken: idToken,
+          accessToken: credential.authorizationCode,
+        );
+        final user = await _loadProfileAndCache(importLegacy: true);
+        return user == null
+            ? const CloudAuthResult.failure('profile_missing')
+            : CloudAuthResult.success(user.copyWith(authSource: 'apple'));
+      } else {
+        // Fallback for offline / local mode when Supabase is not configured
+        final email = (credential.email ?? '').toLowerCase().trim();
+        final givenName = credential.givenName ?? '';
+        final familyName = credential.familyName ?? '';
+        final fullName = ('$givenName $familyName').trim();
+        final name = fullName.isNotEmpty ? fullName : 'Apple Student';
+        final appleId = credential.userIdentifier ??
+            DateTime.now().millisecondsSinceEpoch.toString();
+
+        final localUser = UserModel(
+          id: 'MHR-A${appleId.length >= 6 ? appleId.substring(appleId.length - 6) : appleId}',
+          name: name,
+          email: email,
+          phone: '',
+          avatar: '',
+          ageGroup: 'General / Adult',
+          role: 'student',
+          authSource: 'apple',
+        );
+        await AuthService.cacheCloudUser(localUser);
+        return CloudAuthResult.success(localUser);
+      }
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        return const CloudAuthResult.failure('cancelled');
+      }
+      debugPrint('CloudService.signInWithApple: $e');
+      return const CloudAuthResult.failure('network');
+    } on AuthException catch (e) {
+      debugPrint('CloudService.signInWithApple Supabase: $e');
+      return const CloudAuthResult.failure('network');
+    } catch (e) {
+      debugPrint('CloudService.signInWithApple error: $e');
       return const CloudAuthResult.failure('network');
     }
   }
