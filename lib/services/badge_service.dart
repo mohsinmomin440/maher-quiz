@@ -94,9 +94,9 @@ class BadgeService {
 
   // Record a quiz completion and check if Jumuah badge unlocks
   // The Jumu'ah badge follows the IST calendar, so a student in another
-    // timezone who completes the quiz after local midnight still gets credit
-    // for the correct day.
-    static Future<bool> checkJumuahUnlock() async {
+  // timezone who completes the quiz after local midnight still gets credit
+  // for the correct day.
+  static Future<bool> checkJumuahUnlock() async {
     final now = istNow;
     if (now.weekday == DateTime.friday) {
       final prefs = await SharedPreferences.getInstance();
