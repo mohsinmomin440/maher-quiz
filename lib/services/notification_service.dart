@@ -115,6 +115,9 @@ class NotificationService {
 
       // Subscribe to general announcement topic
       await messaging.subscribeToTopic('all_users');
+      // daily_quiz is a server-pushed reminder (e.g. "today's quiz is ready");
+      // subscribe even when notifications are off so the topic membership is
+      // ready the moment the user turns reminders back on.
       await messaging.subscribeToTopic('daily_quiz');
 
       // Listen to foreground messages and show local banner

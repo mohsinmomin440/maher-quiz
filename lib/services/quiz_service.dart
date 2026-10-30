@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/question_model.dart';
+import '../utils/date_utils.dart';
 import 'auth_service.dart';
 
 List<QuestionModel> _parseQuestions(String jsonStr) {
@@ -126,7 +127,9 @@ class QuizService {
       }
     }
 
-    final now = DateTime.now();
+    // The daily set must be identical for every user, so the seed is derived
+    // from the IST calendar date, not the device clock.
+    final now = istNow;
     // Daily seed: year * 10000 + month * 100 + day
     final seed = now.year * 10000 + now.month * 100 + now.day;
     final random = Random(seed);
@@ -178,13 +181,15 @@ class QuizService {
   // Check if today's quiz was already completed by user
   static bool isDailyQuizCompleted(String? lastQuizDate) {
     if (lastQuizDate == null) return false;
-    final today = DateTime.now().toIso8601String().substring(0, 10);
-    return lastQuizDate == today;
+    return lastQuizDate == istToday;
   }
 
   // Duration remaining until next midnight (24hr cycle reset)
+  // Time remaining until the next daily quiz, i.e. until the next local
+  // midnight in IST. Using the IST date keeps the countdown honest for
+  // students whose device clock is in a different timezone.
   static Duration getTimeUntilNextQuiz() {
-    final now = DateTime.now();
+    final now = istNow;
     final tomorrow = DateTime(now.year, now.month, now.day + 1);
     return tomorrow.difference(now);
   }

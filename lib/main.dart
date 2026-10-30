@@ -32,9 +32,13 @@ void main() async {
   // calling ensureSeeded() on every getCurrentUser() call).
   await AuthService.ensureSeeded();
 
-  // Initialize Notifications (Local Daily Reminders + Firebase Cloud Messaging)
+  // Initialize Notifications (Local Daily Reminders + Firebase Cloud Messaging).
+  // In local mode Firebase isn't initialized, so this is skipped entirely
+  // rather than failing on the FCM permission prompt.
   try {
-    await NotificationService.initialize();
+    if (!kIsWeb) {
+      await NotificationService.initialize();
+    }
   } catch (e) {
     debugPrint('NotificationService init: $e');
   }

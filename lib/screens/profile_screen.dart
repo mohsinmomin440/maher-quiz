@@ -6,6 +6,7 @@ import '../models/badge_model.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 import '../services/badge_service.dart';
+import '../services/cloud_service.dart';
 import '../services/notification_service.dart';
 import '../services/sound_service.dart';
 import '../utils/app_localization.dart';
@@ -101,6 +102,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
       });
       widget.onUserUpdated?.call(updated);
       _loadProfileData();
+    }
+  }
+
+  // Links a guest profile to a real Google account so scores, bookmarks and
+  // the daily streak survive the upgrade. In offline mode this creates a
+  // local account and migrates the guest's data onto it.
+  Future<void> _connectGuestToAccount() async {
+    final result = await CloudService.signInWithGoogle();
+    if (!mounted) return;
+
+    if (result.user != null) {
+      final u = result.user!;
+      final upgraded = u.copyWith(
+        name: u.name.trim().isNotEmpty ? u.name : _user.name,
+        avatar: _user.avatar,
+      );
+      await AuthService.cacheCloudUser(upgraded);
+      if (!mounted) return;
+      setState(() {
+        _user = upgraded;
+      });
+      widget.onUserUpdated?.call(upgraded);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Account connected! Your scores are saved.'),
+          backgroundColor: MaherTheme.emeraldPrimary,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // Sign-in failed or was cancelled: offer the normal login screen.
+    final ok = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
+    if (ok == true && mounted) {
+      final fresh = await AuthService.getCurrentUser();
+      if (fresh != null) {
+        setState(() => _user = fresh);
+        widget.onUserUpdated?.call(fresh);
+      }
     }
   }
 
@@ -926,12 +973,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
               elevation: 0,
             ),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
-              );
-            },
+            // Real Google sign-in links the guest profile to a Supabase account (or a
+            // local one when offline), so scores and bookmarks survive the
+            // upgrade instead of being left behind on the guest profile.
+            onPressed: _connectGuestToAccount,
             child: Text(
               AppLocalization.tr('connect_account'),
               style: const TextStyle(

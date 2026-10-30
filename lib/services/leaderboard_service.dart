@@ -1,4 +1,5 @@
 import '../models/user_model.dart';
+import '../utils/date_utils.dart';
 import 'auth_service.dart';
 import 'cloud_service.dart';
 
@@ -55,7 +56,9 @@ class LeaderboardService {
     }
 
     List<UserModel> list = map.values.toList();
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    // "Played today" is judged against the IST calendar date so students in
+    // other timezones (or with a fiddled clock) get the same ranking.
+    final today = istToday;
 
     switch (filter) {
       case LeaderboardFilter.allTime:

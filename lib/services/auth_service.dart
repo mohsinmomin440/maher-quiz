@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_model.dart';
+import '../utils/date_utils.dart';
 import 'cloud_service.dart';
 
 class AuthService {
@@ -585,8 +586,11 @@ class AuthService {
     }
   }
 
-  static String _todayStr() =>
-      DateTime.now().toIso8601String().substring(0, 10);
+  // Today's date in IST (UTC+5:30), matching the server's quiz_today() and the
+  // daily-quiz midnight reset. The device clock alone is wrong for students
+  // whose timezone is not IST, and it also lets a user fake a "new day" by
+  // changing the clock (the server date is authoritative in online mode).
+  static String _todayStr() => istToday;
 
   static const String _dailyProgressKey = 'maher_daily_progress';
 
@@ -653,7 +657,10 @@ class AuthService {
 
     UserModel updated;
     if (isDaily) {
-      final yesterday = DateTime.now().subtract(const Duration(days: 1));
+      // The streak continues only if the last daily quiz was completed on the
+      // previous calendar day in IST, so a student in a different timezone or
+      // one who changed the clock still gets the fair rule.
+      final yesterday = istNow.subtract(const Duration(days: 1));
       final yesterdayStr = yesterday.toIso8601String().substring(0, 10);
       final newStreak =
           currentUser.lastQuizDate == yesterdayStr ? currentUser.streak + 1 : 1;

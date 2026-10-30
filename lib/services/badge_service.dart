@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/badge_model.dart';
 import '../models/user_model.dart';
+import '../utils/date_utils.dart';
 import '../utils/maher_theme.dart';
 import 'auth_service.dart';
 
@@ -92,8 +93,11 @@ class BadgeService {
   }
 
   // Record a quiz completion and check if Jumuah badge unlocks
-  static Future<bool> checkJumuahUnlock() async {
-    final now = DateTime.now();
+  // The Jumu'ah badge follows the IST calendar, so a student in another
+    // timezone who completes the quiz after local midnight still gets credit
+    // for the correct day.
+    static Future<bool> checkJumuahUnlock() async {
+    final now = istNow;
     if (now.weekday == DateTime.friday) {
       final prefs = await SharedPreferences.getInstance();
       final jumuahKey = await AuthService.userScopedKey(prefs, _jumuahKey);
