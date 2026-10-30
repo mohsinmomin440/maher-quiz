@@ -240,9 +240,21 @@ class AuthService {
     return null;
   }
 
+  static Future<UserModel>? _guestLoginInFlight;
+
   /// Instant Guest Login (zero friction, fully local).
   /// Reuses existing guest profile on device if available, otherwise creates a new one.
   static Future<UserModel> loginAsGuest() async {
+    if (_guestLoginInFlight != null) return _guestLoginInFlight!;
+    _guestLoginInFlight = _loginAsGuestInternal();
+    try {
+      return await _guestLoginInFlight!;
+    } finally {
+      _guestLoginInFlight = null;
+    }
+  }
+
+  static Future<UserModel> _loginAsGuestInternal() async {
     await ensureSeeded();
     final prefs = await SharedPreferences.getInstance();
 
