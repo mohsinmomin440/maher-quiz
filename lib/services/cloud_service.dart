@@ -121,7 +121,8 @@ class CloudService {
   static Future<CloudAuthResult> signInWithGoogle() async {
     try {
       final gs = GoogleSignIn(
-        serverClientId: _googleServerClientId,
+        serverClientId: kIsWeb ? null : _googleServerClientId,
+        clientId: kIsWeb ? _googleServerClientId : null,
         scopes: ['email', 'profile'],
       );
       final account = await gs.signIn();
