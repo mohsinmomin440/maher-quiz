@@ -510,8 +510,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   const SizedBox(height: 18),
 
-                  // Security & Password Card (Only for non-Google accounts)
-                  if (widget.user.authSource != 'google') ...[
+                  // Security & Password Card (Only for local password accounts)
+                  if (widget.user.authSource == 'local') ...[
                     Card(
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
