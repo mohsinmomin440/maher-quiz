@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/question_model.dart';
 import '../services/bookmark_service.dart';
-import '../services/quiz_service.dart';
 import '../utils/maher_icons.dart';
 import '../utils/maher_theme.dart';
 import 'quiz_screen.dart';
@@ -33,13 +32,7 @@ class SavedQuestionsScreenState extends State<SavedQuestionsScreen> {
   }
 
   Future<void> _loadLanguage() async {
-    final lang = await QuizService.getQuestionLanguage();
-    if (mounted) setState(() => _lang = lang);
-  }
-
-  Future<void> _changeLanguage(String newLang) async {
-    await QuizService.setQuestionLanguage(newLang);
-    if (mounted) setState(() => _lang = newLang);
+    if (mounted) setState(() => _lang = 'gu');
   }
 
   Future<void> loadBookmarks() async {
@@ -174,66 +167,6 @@ class SavedQuestionsScreenState extends State<SavedQuestionsScreen> {
           ],
         ),
         actions: [
-          PopupMenuButton<String>(
-            tooltip: 'Question Language',
-            initialValue: _lang,
-            onSelected: _changeLanguage,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Container(
-              margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: MaherTheme.emeraldSoft,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: MaherTheme.emeraldPrimary.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    QuestionModel.languageLabel(_lang),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: MaherTheme.emeraldDark,
-                    ),
-                  ),
-                  const SizedBox(width: 2),
-                  const Icon(Icons.arrow_drop_down,
-                      size: 18, color: MaherTheme.emeraldDark),
-                ],
-              ),
-            ),
-            itemBuilder: (context) => [
-              for (final code in QuestionModel.languages)
-                PopupMenuItem<String>(
-                  value: code,
-                  child: Row(
-                    children: [
-                      Text(
-                        QuestionModel.languageLabel(code),
-                        style: TextStyle(
-                          fontWeight:
-                              _lang == code ? FontWeight.bold : FontWeight.normal,
-                          color: _lang == code
-                              ? MaherTheme.emeraldPrimary
-                              : Colors.black87,
-                        ),
-                      ),
-                      if (_lang == code) ...[
-                        const Spacer(),
-                        const Icon(Icons.check,
-                            size: 18, color: MaherTheme.emeraldPrimary),
-                      ],
-                    ],
-                  ),
-                ),
-            ],
-          ),
           IconButton(
             tooltip: 'Refresh',
             icon: MaherIcons.get('refresh', size: 20, color: MaherTheme.emeraldPrimary),
