@@ -50,6 +50,7 @@ class UserModel {
   }) : createdAt = createdAt ?? DateTime.now().toIso8601String().substring(0, 10);
 
   bool get isAdmin => role == 'admin';
+  bool get isGuest => authSource == 'guest';
 
   // Streak as it stands today: the stored streak only updates when a daily
   // quiz is completed, so it is already broken if the last one was before
