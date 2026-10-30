@@ -1033,7 +1033,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         // Ticks on its own so Home isn't rebuilt every second;
                         // reloads the user at midnight to unlock the new quiz
-                        _DailyCountdown(onNewDay: _loadUser),
+                        _DailyCountdown(onNewDay: _loadUser, currentIndex: _currentIndex),
                       ],
                     ),
                   ),
@@ -1484,8 +1484,9 @@ class _HomeScreenState extends State<HomeScreen> {
 // Live countdown to the next daily quiz (local midnight)
 class _DailyCountdown extends StatefulWidget {
   final VoidCallback onNewDay;
+  final int currentIndex;
 
-  const _DailyCountdown({required this.onNewDay});
+  const _DailyCountdown({required this.onNewDay, required this.currentIndex});
 
   @override
   State<_DailyCountdown> createState() => _DailyCountdownState();
@@ -1499,6 +1500,7 @@ class _DailyCountdownState extends State<_DailyCountdown> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (widget.currentIndex != 0) return; // Only tick when Home tab is active
       final next = QuizService.getTimeUntilNextQuiz();
       // Remaining time jumps back up to ~24h once midnight passes
       final crossedMidnight = next > _remaining;
