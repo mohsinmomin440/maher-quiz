@@ -6,6 +6,7 @@ import '../models/question_model.dart';
 import '../services/auth_service.dart';
 import '../services/badge_service.dart';
 import '../services/notification_service.dart';
+import '../services/quiz_service.dart';
 import '../services/bookmark_service.dart';
 import '../services/sound_service.dart';
 import '../utils/app_localization.dart';
@@ -34,7 +35,7 @@ class _QuizScreenState extends State<QuizScreen> {
   bool _isQuizCompleted = false;
   bool _isFinishing = false;
   Set<String> _bookmarkedIds = {};
-  static const String _lang = 'gu';
+  String _lang = 'gu';
   bool _wrongAnswersSaved = false;
 
   final List<_AnswerRecord> _userAnswers = [];
@@ -42,10 +43,20 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void initState() {
     super.initState();
+    _loadQuestionLanguage();
     _loadBookmarks();
     if (widget.isDaily && widget.questions.isNotEmpty) {
       // Fire-and-forget: locking the daily quiz must not block the first frame.
       unawaited(AuthService.markDailyStarted());
+    }
+  }
+
+  Future<void> _loadQuestionLanguage() async {
+    final lang = await QuizService.getQuestionLanguage();
+    if (mounted) {
+      setState(() {
+        _lang = lang;
+      });
     }
   }
 
@@ -749,6 +760,24 @@ class _QuizScreenState extends State<QuizScreen> {
                                 color: Colors.white,
                                 fontSize: 32,
                                 fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                widget.isDaily
+                                    ? "Daily Quiz • Updated on Leaderboard"
+                                    : "Practice Mode • +$_score Practice XP",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],

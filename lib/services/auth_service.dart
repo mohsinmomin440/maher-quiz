@@ -627,16 +627,17 @@ class AuthService {
     if (currentUser == null) return null;
 
     final today = _todayStr();
-    if (currentUser.dailyStartedDate != today ||
-        currentUser.lastQuizDate == today) {
-      return currentUser;
-    }
+    final already = currentUser.lastQuizDate == today;
+    final locked = currentUser.dailyStartedDate == today;
 
     final key = await userScopedKey(prefs, _dailyProgressKey);
     final parts = (prefs.getString(key) ?? '').split('|');
-    final score = (parts.length == 2 && parts[0] == today)
-        ? (int.tryParse(parts[1]) ?? 0)
-        : 0;
+    final hasProgress = parts.length == 2 && parts[0] == today;
+    final score = hasProgress ? (int.tryParse(parts[1]) ?? 0) : 0;
+
+    if (!locked && !hasProgress && !already) return currentUser;
+    if (already && score <= currentUser.lastQuizScore) return currentUser;
+
     return recordQuizCompletion(score: score, isDaily: true);
   }
 
@@ -652,8 +653,24 @@ class AuthService {
 
     final todayStr = _todayStr();
 
-    // Only one daily result per day counts
-    if (isDaily && currentUser.lastQuizDate == todayStr) return currentUser;
+    // If already completed today, update score if this attempt is higher
+    if (isDaily && currentUser.lastQuizDate == todayStr) {
+      if (score > currentUser.lastQuizScore) {
+        final scoreDiff = score - currentUser.lastQuizScore;
+        final updated = currentUser.copyWith(
+          totalScore: currentUser.totalScore + scoreDiff,
+          lastQuizScore: score,
+        );
+        await _saveCurrentUser(prefs, currentUser, updated);
+        if (CloudService.isEnabled) {
+          final synced =
+              await CloudService.submitQuizResult(score: score, isDaily: isDaily);
+          if (synced != null) return synced;
+        }
+        return updated;
+      }
+      return currentUser;
+    }
 
     UserModel updated;
     if (isDaily) {

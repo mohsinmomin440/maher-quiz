@@ -217,7 +217,9 @@ class CloudService {
   // email template must contain {{ .Token }}, see SUPABASE_SETUP.md).
   static Future<bool> sendPasswordResetCode(String email) async {
     try {
-      await _client.auth.resetPasswordForEmail(email.trim().toLowerCase());
+      await _client.auth
+          .resetPasswordForEmail(email.trim().toLowerCase())
+          .timeout(const Duration(seconds: 15));
       return true;
     } catch (e) {
       debugPrint('CloudService.sendPasswordResetCode: $e');

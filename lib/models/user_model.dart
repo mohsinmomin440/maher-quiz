@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/date_utils.dart';
 
 class UserModel {
   final String id;
@@ -47,17 +48,17 @@ class UserModel {
     this.dailyStartedDate,
     this.mustChangePassword = false,
     this.authSource = 'local',
-  }) : createdAt = createdAt ?? DateTime.now().toIso8601String().substring(0, 10);
+  }) : createdAt = createdAt ?? istToday;
 
   bool get isAdmin => role == 'admin';
   bool get isGuest => authSource == 'guest';
 
   // Streak as it stands today: the stored streak only updates when a daily
   // quiz is completed, so it is already broken if the last one was before
-  // yesterday.
+  // yesterday (judged in IST).
   int get effectiveStreak {
     if (lastQuizDate == null) return 0;
-    final now = DateTime.now();
+    final now = istNow;
     final today = DateTime(now.year, now.month, now.day);
     final last = DateTime.tryParse(lastQuizDate!);
     if (last == null) return 0;

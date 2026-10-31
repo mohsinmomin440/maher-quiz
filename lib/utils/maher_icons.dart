@@ -399,6 +399,7 @@ class MaherIcons {
     'bookmark': _bookmarkFilledSvg,
     'bookmark-filled': _bookmarkFilledSvg,
     'bookmark-outline': _bookmarkOutlineSvg,
+    'star': _starIslamicSvg,
     'star-islamic': _starIslamicSvg,
     'badge-verified': _badgeVerifiedSvg,
     'chart-bar': _chartBarSvg,

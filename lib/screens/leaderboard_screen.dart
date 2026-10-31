@@ -59,6 +59,17 @@ class LeaderboardScreenState extends State<LeaderboardScreen> {
     loadLeaderboard();
   }
 
+  String _formatScore(UserModel user) {
+    switch (_selectedFilter) {
+      case LeaderboardFilter.today:
+        return '${user.lastQuizScore} pts';
+      case LeaderboardFilter.streak:
+        return '${user.effectiveStreak} days';
+      case LeaderboardFilter.allTime:
+        return '${user.totalScore} pts';
+    }
+  }
+
   LeaderboardEntry? get _currentUserEntry {
     for (final e in _entries) {
       if (e.isCurrentUser) return e;
@@ -285,7 +296,7 @@ class LeaderboardScreenState extends State<LeaderboardScreen> {
                     ),
                   ),
                   Text(
-                    '${currentEntry.user.totalScore} pts • ${currentEntry.user.effectiveStreak} day streak',
+                    '${_formatScore(currentEntry.user)} • ${currentEntry.user.effectiveStreak} day streak',
                     style: const TextStyle(
                       color: Colors.white70,
                       fontSize: 12,
@@ -480,7 +491,7 @@ class LeaderboardScreenState extends State<LeaderboardScreen> {
             borderRadius: BorderRadius.circular(10),
           ),
           child: Text(
-            '${entry.user.totalScore} pts',
+            _formatScore(entry.user),
             style: TextStyle(
               fontSize: 11.5,
               fontWeight: FontWeight.w800,
@@ -650,7 +661,7 @@ class LeaderboardScreenState extends State<LeaderboardScreen> {
             borderRadius: BorderRadius.circular(14),
           ),
           child: Text(
-            '${entry.user.totalScore} pts',
+            _formatScore(entry.user),
             style: TextStyle(
               fontWeight: FontWeight.w900,
               color: isCurrent ? Colors.white : MaherTheme.emeraldPrimary,

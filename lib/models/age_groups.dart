@@ -10,15 +10,20 @@ class AgeGroups {
 
   static const String defaultGroup = class2;
 
-  // Maps legacy stored values (e.g. 'Age 8-10 (Deeniyat Class 2)',
-  // 'Age 6 to 10 (Deeniyat Class 2)') onto the current options.
+  // Maps legacy and Gujarati stored values onto the canonical options.
   static String normalize(String? value) {
     if (value == null || value.trim().isEmpty) return general;
     if (all.contains(value)) return value;
     final lower = value.toLowerCase();
-    if (lower.contains('class 1')) return class1;
-    if (lower.contains('class 2')) return class2;
-    if (lower.contains('class 3')) return class3;
+    if (lower.contains('૪ થી ૭') || lower.contains('4 to 7') || lower.contains('4-7') || lower.contains('class 1')) {
+      return class1;
+    }
+    if (lower.contains('૮ થી ૧૧') || lower.contains('8 to 11') || lower.contains('8-11') || lower.contains('class 2')) {
+      return class2;
+    }
+    if (lower.contains('૧૨ થી ૧૪') || lower.contains('12 to 14') || lower.contains('12-14') || lower.contains('class 3')) {
+      return class3;
+    }
     return general;
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/question_model.dart';
 import '../services/bookmark_service.dart';
+import '../services/quiz_service.dart';
 import '../utils/maher_icons.dart';
 import '../utils/maher_theme.dart';
 import 'quiz_screen.dart';
@@ -22,12 +23,20 @@ class SavedQuestionsScreenState extends State<SavedQuestionsScreen> {
 
   List<QuestionModel> _savedQuestions = [];
   bool _isLoading = true;
-  static const String _lang = 'gu';
+  String _lang = 'gu';
 
   @override
   void initState() {
     super.initState();
+    _loadQuestionLanguage();
     loadBookmarks();
+  }
+
+  Future<void> _loadQuestionLanguage() async {
+    final lang = await QuizService.getQuestionLanguage();
+    if (mounted) {
+      setState(() => _lang = lang);
+    }
   }
 
   Future<void> loadBookmarks() async {

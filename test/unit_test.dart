@@ -81,10 +81,28 @@ void main() {
       expect(updated?.streak, 1);
       expect(updated?.effectiveStreak, 1);
 
-      // Duplicate daily completion on the same day must not increment score
+      // Duplicate daily completion on the same day with same or lower score does not change score
       final duplicate = await AuthService.recordQuizCompletion(score: 5, isDaily: true);
       expect(duplicate?.totalScore, 5);
       expect(duplicate?.streak, 1);
+    });
+
+    test('Daily quiz higher score retry updates difference and lastQuizScore', () async {
+      await AuthService.register(
+        name: 'Aisha',
+        identifier: '9876543219',
+        password: 'password123',
+        ageGroup: AgeGroups.class2,
+      );
+
+      final attempt1 = await AuthService.recordQuizCompletion(score: 1, isDaily: true);
+      expect(attempt1?.totalScore, 1);
+      expect(attempt1?.lastQuizScore, 1);
+
+      // User retries and gets 5/5
+      final attempt2 = await AuthService.recordQuizCompletion(score: 5, isDaily: true);
+      expect(attempt2?.totalScore, 5);
+      expect(attempt2?.lastQuizScore, 5);
     });
 
     test('Practice rounds add to practiceXp, not totalScore', () async {
@@ -143,10 +161,13 @@ void main() {
   });
 
   group('AgeGroups normalization tests', () {
-    test('Normalizes legacy class values correctly', () {
+    test('Normalizes legacy and Gujarati class values correctly', () {
       expect(AgeGroups.normalize('Age 4-7 (Deeniyat Class 1)'), AgeGroups.class1);
       expect(AgeGroups.normalize('Class 2'), AgeGroups.class2);
       expect(AgeGroups.normalize('Class 3'), AgeGroups.class3);
+      expect(AgeGroups.normalize('૪ થી ૭ વર્ષ'), AgeGroups.class1);
+      expect(AgeGroups.normalize('૮ થી ૧૧ વર્ષ'), AgeGroups.class2);
+      expect(AgeGroups.normalize('૧૨ થી ૧૪ વર્ષ'), AgeGroups.class3);
       expect(AgeGroups.normalize(null), AgeGroups.general);
     });
   });

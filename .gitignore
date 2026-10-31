@@ -33,6 +33,7 @@ problem.png
 # Dart/Flutter cache
 .dart_tool/
 .gen/
+.kotlin/
 
 # Localization / generated files
 **.g.dart

@@ -131,7 +131,7 @@ declare
   uid uuid := auth.uid();
   today date := public.quiz_today();
   safe_score int := least(greatest(coalesce(p_score, 0), 0), 5);
-  inserted int;
+  existing_score int;
   prof public.profiles;
 begin
   if uid is null then raise exception 'not signed in'; end if;
@@ -139,15 +139,28 @@ begin
     raise exception 'quiz date % outside allowed range', p_date;
   end if;
 
-  insert into public.daily_results (user_id, quiz_date, score)
-  values (uid, p_date, safe_score)
-  on conflict do nothing;
-  get diagnostics inserted = row_count;
+  select score into existing_score from public.daily_results
+  where user_id = uid and quiz_date = p_date;
 
-  if inserted = 0 then
-    select * into prof from public.profiles where id = uid;
-    return prof; -- already submitted for that day: no change
+  if existing_score is not null then
+    if safe_score > existing_score then
+      update public.daily_results set score = safe_score
+      where user_id = uid and quiz_date = p_date;
+
+      update public.profiles p set
+        total_score = p.total_score + (safe_score - existing_score),
+        last_quiz_score = safe_score
+      where p.id = uid
+      returning * into prof;
+      return prof;
+    else
+      select * into prof from public.profiles where id = uid;
+      return prof; -- already submitted with equal or higher score
+    end if;
   end if;
+
+  insert into public.daily_results (user_id, quiz_date, score)
+  values (uid, p_date, safe_score);
 
   update public.profiles p set
     streak = case

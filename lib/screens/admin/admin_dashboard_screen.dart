@@ -171,76 +171,80 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final passController =
         TextEditingController(text: AuthService.generateTemporaryPassword());
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Row(
-          children: [
-            MaherIcons.get('key', size: 24, color: MaherTheme.emeraldPrimary),
-            const SizedBox(width: 10),
-            const Text('Reset User Password'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Set a temporary password for ${targetUser.name}. '
-              'They will be asked to choose a new one at their next login.',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: passController,
-              decoration: const InputDecoration(
-                labelText: 'New Password',
-                hintText: 'Enter new password',
-                border: OutlineInputBorder(),
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: Row(
+            children: [
+              MaherIcons.get('key', size: 24, color: MaherTheme.emeraldPrimary),
+              const SizedBox(width: 10),
+              const Text('Reset User Password'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Set a temporary password for . '
+                'They will be asked to choose a new one at their next login.',
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passController,
+                decoration: const InputDecoration(
+                  labelText: 'New Password',
+                  hintText: 'Enter new password',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(AppLocalization.tr('cancel')),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: MaherTheme.emeraldPrimary,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Reset Password'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(AppLocalization.tr('cancel')),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: MaherTheme.emeraldPrimary,
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Reset Password'),
-          ),
-        ],
-      ),
-    );
+      );
 
-    if (confirmed == true) {
-      final newPass = passController.text.trim();
-      if (newPass.length < 6) {
+      if (confirmed == true) {
+        final newPass = passController.text.trim();
+        if (newPass.length < 6) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Password must be at least 6 characters!'),
+                backgroundColor: MaherTheme.errorRed,
+              ),
+            );
+          }
+          return;
+        }
+        final ok = await AuthService.adminResetPassword(targetUser.email, newPass);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Password must be at least 6 characters!'),
-              backgroundColor: MaherTheme.errorRed,
+            SnackBar(
+              content: Text(ok
+                  ? 'Temporary password set for . Share it with them privately.'
+                  : 'Could not reset password for .'),
+              backgroundColor: ok ? MaherTheme.emeraldPrimary : MaherTheme.errorRed,
             ),
           );
         }
-        return;
       }
-      final ok = await AuthService.adminResetPassword(targetUser.email, newPass);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(ok
-                ? 'Temporary password set for ${targetUser.name}. Share it with them privately.'
-                : 'Could not reset password for ${targetUser.name}.'),
-            backgroundColor: ok ? MaherTheme.emeraldPrimary : MaherTheme.errorRed,
-          ),
-        );
-      }
+    } finally {
+      passController.dispose();
     }
   }
 

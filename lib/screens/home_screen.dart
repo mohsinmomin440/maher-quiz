@@ -103,7 +103,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (mounted) {
-      _loadUser();
+      await _loadUser();
+      _leaderboardKey.currentState?.loadLeaderboard();
     }
   }
 
@@ -124,7 +125,8 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
     if (mounted) {
-      _loadUser();
+      await _loadUser();
+      _leaderboardKey.currentState?.loadLeaderboard();
     }
   }
 
@@ -1368,6 +1370,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
+                if ((_user?.practiceXp ?? 0) > 0) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '+${_user?.practiceXp} Practice XP',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: MaherTheme.goldDark,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1500,12 +1513,16 @@ class _DailyCountdownState extends State<_DailyCountdown> {
   void initState() {
     super.initState();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (widget.currentIndex != 0) return; // Only tick when Home tab is active
       final next = QuizService.getTimeUntilNextQuiz();
       // Remaining time jumps back up to ~24h once midnight passes
       final crossedMidnight = next > _remaining;
-      setState(() => _remaining = next);
-      if (crossedMidnight) widget.onNewDay();
+      _remaining = next;
+      if (mounted && widget.currentIndex == 0) {
+        setState(() {});
+      }
+      if (crossedMidnight) {
+        widget.onNewDay();
+      }
     });
   }
 

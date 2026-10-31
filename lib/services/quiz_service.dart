@@ -190,7 +190,7 @@ class QuizService {
   // students whose device clock is in a different timezone.
   static Duration getTimeUntilNextQuiz() {
     final now = istNow;
-    final tomorrow = DateTime(now.year, now.month, now.day + 1);
+    final tomorrow = DateTime.utc(now.year, now.month, now.day + 1);
     return tomorrow.difference(now);
   }
 }

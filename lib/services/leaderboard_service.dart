@@ -50,8 +50,8 @@ class LeaderboardService {
       }
     }
 
-    // Always ensure current student is present with their latest session stats
-    if (!currentUser.isAdmin) {
+    // Always ensure current user is present with their latest session stats (if student)
+    if (!currentUser.isAdmin && currentUser.id.isNotEmpty) {
       map[currentUser.id] = currentUser;
     }
 
@@ -79,12 +79,12 @@ class LeaderboardService {
 
       case LeaderboardFilter.today:
         list.sort((a, b) {
-          final aToday = a.lastQuizDate == today ? 1 : 0;
-          final bToday = b.lastQuizDate == today ? 1 : 0;
-          final cmpToday = bToday.compareTo(aToday);
-          if (cmpToday != 0) return cmpToday;
-          final cmpScore = b.lastQuizScore.compareTo(a.lastQuizScore);
+          final aTodayScore = a.lastQuizDate == today ? a.lastQuizScore : 0;
+          final bTodayScore = b.lastQuizDate == today ? b.lastQuizScore : 0;
+          final cmpScore = bTodayScore.compareTo(aTodayScore);
           if (cmpScore != 0) return cmpScore;
+          final cmpTotal = b.totalScore.compareTo(a.totalScore);
+          if (cmpTotal != 0) return cmpTotal;
           return b.effectiveStreak.compareTo(a.effectiveStreak);
         });
         break;
